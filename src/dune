@@ -1,0 +1,9 @@
+(executable
+ (public_name melitte)
+ (name melitte)
+ (libraries menhirLib pprint sexplib)
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord))
+ (promote (until-clean)))
+
+(menhir (modules Parse) (flags --explain --table))
+(ocamllex (modules Lex))

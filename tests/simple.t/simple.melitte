@@ -1,0 +1,7 @@
+val x : 𝕌 = Nat
+
+val three : x = succ succ succ zero
+
+val const : ℕ → ℕ = λ x → zero
+
+{- val add : ℕ → ℕ → ℕ = λ x → λ y → zero -}
