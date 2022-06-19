@@ -18,8 +18,7 @@
         ["zero"], ZERO;
         ["succ"], SUCC;
         ["elim"], ELIM;
-        ["as"], AS;
-        ["return"], RETURN;
+        ["with"], WITH;
         ["val"], VAL;
       ]
 
@@ -82,8 +81,7 @@ let string_of_token = function
 | ZERO -> "ZERO"
 | SUCC -> "SUCC"
 | ELIM -> "ELIM"
-| AS -> "AS"
-| RETURN -> "RETURN"
+| WITH -> "WITH"
 | VAL -> "VAL"
 | LPAREN -> "LPAREN"
 | RPAREN -> "RPAREN"

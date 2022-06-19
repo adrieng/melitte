@@ -2,38 +2,35 @@
 
 (** This module defines raw terms, as produced by the parser. *)
 
-type raw_name = string [@@deriving show]
+(** At this level, names are simply strings. The transformation from strings to
+    DeBruijn indices happens during elaboration. *)
+
+type name = string [@@deriving show]
+
+type pat = name option [@@deriving show]
+
+type 'a weakened = pat * 'a [@@deriving show]
 
 type term =
-  | Var of raw_name
-  | Lam of weakened_term
+  | Var of name
+  | Lam of term weakened
   | App of term * term
-  | Forall of weakened_term
-  | Let of term * weakened_term
+  | Forall of ty * ty weakened
+  | Let of { bound : term;
+             ty : ty;
+             body : term weakened; }
   | Type
-  | Nat
-  | Zero
-  | Succ of term
-  | Natelim of term * (pat * ty) * term * weakened_term
-                                             [@@deriving show]
+  | Nat | Zero | Succ
+  | Natelim of { discr : term;
+                 motive : term weakened option;
+                 case_zero : term;
+                 case_succ : term weakened; }
+                 [@@deriving show]
 
 and ty = term
 
-and pat = raw_name option
-
-and binding =
-  {
-    id : pat;
-    ann : ty option;
-  }
-
-and weakened_term = binding * term
-
-and weakened_ty = weakened_term
-
 type phrase =
-  | Val of binding * term
-                       [@@deriving show]
+  | Val of name * ty * term
+                         [@@deriving show]
 
-type t = phrase list
-           [@@deriving show]
+type t = phrase list [@@deriving show]

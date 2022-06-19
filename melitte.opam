@@ -15,6 +15,7 @@ depends: [
   "menhir"
   "ppx_deriving"
   "sexplib"
+  "sedlex"
   "odoc" {with-doc}
 ]
 build: [

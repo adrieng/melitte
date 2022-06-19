@@ -4,4 +4,13 @@ val three : x = succ succ succ zero
 
 val const : ℕ → ℕ = λ x → zero
 
-{- val add : ℕ → ℕ → ℕ = λ x → λ y → zero -}
+val id : ∀ (A : 𝕌) → A → A = λ A → λ x → x
+
+val iter : ∀ (A : 𝕌) (f : A → A) → ℕ → A → A =
+  λ A f n z → elim n { zero ⇒ z | succ r ⇒ f r }
+
+val add : ℕ → ℕ → ℕ = iter ℕ succ
+
+val mul : ℕ → ℕ → ℕ = iter ℕ add
+
+val exp : ℕ → ℕ → ℕ = iter ℕ mul
