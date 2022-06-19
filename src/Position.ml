@@ -72,6 +72,9 @@ let unknown_pos v =
     position  = dummy
   }
 
+let pp_located pp fmt x =
+  pp fmt x.value
+
 let start_of_position p = p.start_p
 
 let end_of_position p = p.end_p

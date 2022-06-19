@@ -26,3 +26,5 @@ module type PrintableType = sig
   type t
   val pp : t -> PPrint.document
 end
+
+type 'a pp = Format.formatter -> 'a -> unit

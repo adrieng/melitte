@@ -47,8 +47,6 @@ rule token = parse
 | ')' { RPAREN }
 | '{' { LBRACE }
 | '}' { RBRACE }
-| '[' { LBRACKET }
-| ']' { RBRACKET }
 
 | '=' { EQ }
 | "->" | "→" { ARR }
@@ -87,8 +85,6 @@ let string_of_token = function
 | RPAREN -> "RPAREN"
 | LBRACE -> "LBRACE"
 | RBRACE -> "RBRACE"
-| LBRACKET -> "LBRACKET"
-| RBRACKET -> "RBRACKET"
 | EQ -> "EQ"
 | ARR -> "ARR"
 | DARR -> "DARR"

@@ -40,6 +40,11 @@ val with_poss : Lexing.position -> Lexing.position -> 'a -> 'a located
 (** [unknown_pos x] decorates [v] with an unknown position. *)
 val unknown_pos : 'a -> 'a located
 
+(** [pp_locate pp fmt x] pretty-prints [x] using [pp], discarding locations. *)
+val pp_located :
+  (Format.formatter -> 'a -> unit) ->
+  Format.formatter -> 'a located -> unit
+
 (** This value is used when an object does not come from a particular
     input location. *)
 val dummy: t
