@@ -1,28 +1,16 @@
-open Lex2
-
 let parse inp =
   let fname, ic =
     match inp with
     | `Stdin -> "*stdin*", stdin
     | `File fname -> fname, open_in fname
   in
-  let lexbuf = Lexing.from_channel ~with_positions:true ic in
-  lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with pos_fname = fname; };
-  let raw = Parse.file Lex.token lexbuf in
+  let lexbuf = Sedlexing.Utf8.from_channel ic in
+  Sedlexing.set_filename lexbuf fname;
+  let token = Sedlexing.with_tokenizer Lex.token lexbuf in
+  let file = MenhirLib.Convert.Simplified.traditional2revised Parse.file in
+  let raw = file token in
   close_in ic;
   raw
-
-(* let parse' inp = *)
-(*   let fname, ic = *)
-(*     match inp with *)
-(*     | `Stdin -> "*stdin*", stdin *)
-(*     | `File fname -> fname, open_in fname *)
-(*   in *)
-(*   let lexbuf = Sedlexing.Utf8.from_channel ic in *)
-(*   Sedlexing.set_filename lexbuf fname; *)
-(* Parse.file Lex2.token lexbuf in *)
-(*   close_in ic; *)
-(*   raw *)
 
 let process inp =
   try
@@ -40,7 +28,6 @@ let () =
     (align
        [
          "-stdin", Set process_stdin, " read standard input";
-         "-dbg-lexer", Set Lex.debug, " print lexeme stream";
        ]
     )
     (fun s -> inputs := `File s :: !inputs)

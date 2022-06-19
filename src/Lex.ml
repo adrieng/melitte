@@ -33,9 +33,19 @@ let keyword_or_ident =
 
 (** {1 Error handling} *)
 
+let error reason lexbuf =
+  let startp, endp = Sedlexing.lexing_positions lexbuf in
+  Error.syntax reason startp endp
+
 let invalid_character lexbuf =
-  let s = utf8_string_of_lexbuf lexbuf in
-  Error.syntax' (Printf.sprintf "invalid character '%s'" s) lexbuf
+  let reason =
+    match Sedlexing.next lexbuf with
+    | None -> "unknown character"
+    | Some c ->
+       let s = utf8_string_of_uchar_array [| c |] in
+       Printf.sprintf "invalid character '%s'" s
+  in
+  error reason lexbuf
 
 (** {1 Lexing} *)
 
@@ -48,14 +58,13 @@ let comment_start = [%sedlex.regexp? "{-"]
 let comment_stop = [%sedlex.regexp? "-}"]
 
 let rec token lexbuf = match%sedlex lexbuf with
-  | '\n' -> Sedlexing.new_line lexbuf; token lexbuf
   | white_space -> token lexbuf
 
   | comment_start -> comments 1 lexbuf
 
   | '(' -> LPAREN
   | ')' -> RPAREN
-  | "->" -> LBRACE
+  | "{" -> LBRACE
   | '}' -> RBRACE
 
   | '=' -> EQ
@@ -67,14 +76,15 @@ let rec token lexbuf = match%sedlex lexbuf with
 
   | atom -> keyword_or_ident (utf8_string_of_lexbuf lexbuf)
 
+  | eof -> EOF
+
   | _ -> invalid_character lexbuf
 
 and comments n lexbuf =
   if n <= 0 then token lexbuf
   else
     match%sedlex lexbuf with
-    | '\n' -> Sedlexing.new_line lexbuf; comments n lexbuf
     | comment_start -> comments (n + 1) lexbuf
     | comment_stop -> comments (n - 1) lexbuf
-    | eof -> Error.syntax' "unterminated comment" lexbuf
+    | eof -> error "unterminated comment" lexbuf
     | _ -> comments n lexbuf

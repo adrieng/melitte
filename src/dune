@@ -6,4 +6,3 @@
  (promote (until-clean)))
 
 (menhir (modules Parse) (flags --explain --table))
-(ocamllex (modules Lex))
