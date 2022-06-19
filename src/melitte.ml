@@ -1,3 +1,5 @@
+open Lex2
+
 let parse inp =
   let fname, ic =
     match inp with
@@ -9,6 +11,18 @@ let parse inp =
   let raw = Parse.file Lex.token lexbuf in
   close_in ic;
   raw
+
+(* let parse' inp = *)
+(*   let fname, ic = *)
+(*     match inp with *)
+(*     | `Stdin -> "*stdin*", stdin *)
+(*     | `File fname -> fname, open_in fname *)
+(*   in *)
+(*   let lexbuf = Sedlexing.Utf8.from_channel ic in *)
+(*   Sedlexing.set_filename lexbuf fname; *)
+(* Parse.file Lex2.token lexbuf in *)
+(*   close_in ic; *)
+(*   raw *)
 
 let process inp =
   try
