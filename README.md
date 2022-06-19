@@ -5,13 +5,16 @@ in the OCaml language.
 
 ## Compiling
 
-You need a working OCaml development environment with Dune and OPAM. To install
-dependencies and compile, simply run the following commands.
+To compile Mélitte, you need a working OCaml development environment and some
+libraries. The easiest and cleanest way to install them is to create a local
+OPAM switch. The repository provides a script to do so.
 
 ```shell
-$ ./install-deps.sh
+$ ./create-local-switch.sh
 $ dune build
 ```
+
+(The script also installs Tuareg and Merlin for developer convenience.)
 
 Some example programs to exercise the type-checker can be found in the
 [test](test/) directory. Run them using `dune test`.
