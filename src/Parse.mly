@@ -1,14 +1,7 @@
 %{ (* -*- mode: tuareg -*- *)
-    open Raw
+   open Raw
 
-    let mk_lam ids body =
-      (List.fold_right lam ids body).Position.value
-
-    let mk_forall hyps body =
-      (List.fold_right forall hyps body).Position.value
-
-    let mk_arr a b =
-      Forall (a, ({ value = None; position = a.position; }, b))
+   let v = Position.value
 %}
 
 %token<string> ID
@@ -40,8 +33,8 @@ simple_term_:
 | NAT { Nat }
 | ZERO { Zero }
 | SUCC { Succ }
-| FORALL hyps = parens(hyp)+ ARR b = ty { mk_forall hyps b }
-| a = ty ARR b = ty { mk_arr a b }
+| FORALL hyps = parens(hyp)+ ARR b = ty { v @@ Build.forall hyps b }
+| a = ty ARR b = ty { v @@ Build.arrow a b }
 | te = parens(term_) { te }
 
 simple_term:
@@ -51,13 +44,13 @@ weakened_term(X):
 | b = hyp X te = term { (b, te) }
 
 motive:
-| WITH p = pat DARR ty = ty { (p, ty) }
+| WITH p = pattern DARR ty = ty { (p, ty) }
 
 term_:
 | t = simple_term_ { t }
-| LAM ids = pat+ ARR t = term { mk_lam ids t }
+| LAM ids = pattern+ DARR t = term { v @@ Build.lambda ids t }
 | f = simple_term a = term { App (f, a) }
-| LET p = pat COLON ty = ty EQ bound = term IN body = term
+| LET p = pattern COLON ty = ty EQ bound = term IN body = term
   { Let { bound; ty; body = (p, body); } }
 | ELIM discr = term motive = motive?
   LBRACE
@@ -71,17 +64,17 @@ term:
 ty: simple_term { $1 }
 
 binding(SEP):
-| x = pat SEP t = term { (x, t) }
+| x = pattern SEP t = term { (x, t) }
 
-pat_:
-| UNDERSCORE { None }
-| id = ID { Some id }
+pattern_:
+| UNDERSCORE { PWildcard }
+| id = ID { PVar id }
 
-pat:
-| located(pat_) { $1 }
+pattern:
+| located(pattern_) { $1 }
 
 hyp:
-| p = pat COLON ty = ty { (p, ty) }
+| p = pattern COLON ty = ty { (p, ty) }
 
 phrase:
 | VAL id = name COLON ty = ty EQ t = term { Val (id, ty, t) }

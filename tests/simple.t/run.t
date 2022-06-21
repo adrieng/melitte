@@ -4,41 +4,50 @@
        (Raw.App (Raw.Succ, (Raw.App (Raw.Succ, (Raw.App (Raw.Succ, Raw.Zero))))
           ))
        ));
-    (Raw.Val ("const", (Raw.Forall (Raw.Nat, (None, Raw.Nat))),
-       (Raw.Lam ((Some "x"), Raw.Zero))));
+    (Raw.Val ("const", (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat))),
+       (Raw.Lam ((Raw.PVar "x"), Raw.Zero))));
     (Raw.Val ("id",
        (Raw.Forall (Raw.Type,
-          ((Some "A"), (Raw.Forall ((Raw.Var "A"), (None, (Raw.Var "A"))))))),
-       (Raw.Lam ((Some "A"), (Raw.Lam ((Some "x"), (Raw.Var "x")))))));
+          ((Raw.PVar "A"),
+           (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))))
+          )),
+       (Raw.Lam ((Raw.PVar "A"), (Raw.Lam ((Raw.PVar "x"), (Raw.Var "x")))))));
     (Raw.Val ("iter",
        (Raw.Forall (Raw.Type,
-          ((Some "A"),
-           (Raw.Forall ((Raw.Forall ((Raw.Var "A"), (None, (Raw.Var "A")))),
-              ((Some "f"),
+          ((Raw.PVar "A"),
+           (Raw.Forall (
+              (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))),
+              ((Raw.PVar "f"),
                (Raw.Forall (Raw.Nat,
-                  (None, (Raw.Forall ((Raw.Var "A"), (None, (Raw.Var "A"))))))))
+                  (Raw.PWildcard,
+                   (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))))
+                  )))
               )))
           )),
        (Raw.Lam
-          ((Some "A"),
+          ((Raw.PVar "A"),
            (Raw.Lam
-              ((Some "f"),
+              ((Raw.PVar "f"),
                (Raw.Lam
-                  ((Some "n"),
+                  ((Raw.PVar "n"),
                    (Raw.Lam
-                      ((Some "z"),
+                      ((Raw.PVar "z"),
                        Raw.Natelim {discr = (Raw.Var "n"); motive = None;
                          case_zero = (Raw.Var "z");
                          case_succ =
-                         ((Some "r"), (Raw.App ((Raw.Var "f"), (Raw.Var "r"))))}))))))))
+                         ((Raw.PVar "r"),
+                          (Raw.App ((Raw.Var "f"), (Raw.Var "r"))))}))))))))
        ));
     (Raw.Val ("add",
-       (Raw.Forall (Raw.Nat, (None, (Raw.Forall (Raw.Nat, (None, Raw.Nat)))))),
+       (Raw.Forall (Raw.Nat,
+          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
        (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, Raw.Succ))))));
     (Raw.Val ("mul",
-       (Raw.Forall (Raw.Nat, (None, (Raw.Forall (Raw.Nat, (None, Raw.Nat)))))),
+       (Raw.Forall (Raw.Nat,
+          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
        (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, (Raw.Var "add")))))));
     (Raw.Val ("exp",
-       (Raw.Forall (Raw.Nat, (None, (Raw.Forall (Raw.Nat, (None, Raw.Nat)))))),
+       (Raw.Forall (Raw.Nat,
+          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
        (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, (Raw.Var "mul")))))))
     ]

@@ -15,7 +15,7 @@ let parse inp =
 let process inp =
   try
     let raw = parse inp in
-    Format.printf "%a@." Raw.pp raw
+    ExtPrint.to_out (Raw.PPrint.file raw)
   with Error.Error err ->
     Format.eprintf "%a@." Error.print err;
     exit 1

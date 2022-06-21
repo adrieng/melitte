@@ -2,13 +2,8 @@ open Parse
 
 (** {1 Utilities} *)
 
-let utf8_string_of_uchar_array a =
-  let b = Buffer.create (Array.length a) in
-  Array.iter (Buffer.add_utf_8_uchar b) a;
-  Buffer.contents b
-
 let utf8_string_of_lexbuf lexbuf =
-  utf8_string_of_uchar_array (Sedlexing.lexeme lexbuf)
+  Sigs.Unicode.utf8_string_of_uchar_array (Sedlexing.lexeme lexbuf)
 
 let tabulate default table =
   let ht = Hashtbl.create 100 in
@@ -18,12 +13,11 @@ let tabulate default table =
 let keyword_or_ident =
   tabulate (fun n -> ID n)
     [
-      ["fun"; "λ"], LAM;
       ["forall"; "∀"], FORALL;
       ["let"], LET;
       ["in"], IN;
       ["Type"; "𝕌"], TYPE;
-      ["Nat"; "N"; "ℕ"], NAT;
+      ["Nat"; "ℕ"], NAT;
       ["zero"], ZERO;
       ["succ"], SUCC;
       ["elim"], ELIM;
@@ -42,14 +36,15 @@ let invalid_character lexbuf =
     match Sedlexing.next lexbuf with
     | None -> "unknown character"
     | Some c ->
-       let s = utf8_string_of_uchar_array [| c |] in
+       let s = Sigs.Unicode.utf8_string_of_uchar_array [| c |] in
        Printf.sprintf "invalid character '%s'" s
   in
   error reason lexbuf
 
 (** {1 Lexing} *)
 
-let quark = [%sedlex.regexp? alphabetic | other_alphabetic | math | other_math]
+let quark = [%sedlex.regexp? alphabetic | other_alphabetic
+             | math | other_math | '_']
 
 let atom = [%sedlex.regexp? quark, Star (quark | ascii_hex_digit)]
 
@@ -73,6 +68,7 @@ let rec token lexbuf = match%sedlex lexbuf with
   | "_" -> UNDERSCORE
   | ":" -> COLON
   | "|" -> BAR
+  | '\\' | 955 -> LAM
 
   | atom -> keyword_or_ident (utf8_string_of_lexbuf lexbuf)
 

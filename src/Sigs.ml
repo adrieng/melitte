@@ -27,4 +27,13 @@ module type PrintableType = sig
   val pp : t -> PPrint.document
 end
 
-type 'a pp = Format.formatter -> 'a -> unit
+module Formatter = struct
+  type 'a t = Format.formatter -> 'a -> unit
+end
+
+module Unicode = struct
+  let utf8_string_of_uchar_array a =
+    let b = Buffer.create (Array.length a) in
+    Array.iter (Buffer.add_utf_8_uchar b) a;
+    Buffer.contents b
+end
