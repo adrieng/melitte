@@ -46,18 +46,12 @@ and term = term_desc Position.located
 
 and ty = term
 
-type phrase =
+type phrase_desc =
   | Val of name * ty * term
 
+and phrase = phrase_desc Position.located
+
 type t = phrase list
-
-val pp_term_desc : term_desc Sigs.Formatter.t
-
-val pp_term : term Sigs.Formatter.t
-
-val pp_phrase : phrase Sigs.Formatter.t
-
-val pp : t Sigs.Formatter.t
 
 module Build : sig
   val lambda : pattern list -> term -> term

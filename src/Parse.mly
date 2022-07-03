@@ -76,8 +76,11 @@ pattern:
 hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
-phrase:
+phrase_desc:
 | VAL id = name COLON ty = ty EQ t = term { Val (id, ty, t) }
+
+phrase:
+| p = located(phrase_desc) { p }
 
 file:
 | xs = phrase* EOF { xs }

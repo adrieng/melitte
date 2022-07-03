@@ -27,8 +27,10 @@ and term = term_desc Position.located
 
 and ty = term
 
-and phrase =
+and phrase_desc =
   | Val of name * ty * term
+
+and phrase = phrase_desc Position.located
 
 and t = phrase list [@@deriving show]
 
@@ -95,14 +97,24 @@ module PPrint = struct
        string "zero"
     | Succ ->
        string "succ"
-    | Forall _ as t ->
+
+    | Forall (_, ({ Position.value = PVar _; _ }, _)) as t ->
        let rec print_forall = function
-         | Forall (a, (p, c)) ->
+         | Forall (a, ({ Position.value = PVar _; _ } as p, c)) ->
             parens (hyp p a) ^/^ print_forall c.Position.value
          | t ->
             U.(doc sarrow) ^/^ term_desc t
        in
        group (U.(doc forall) ^/^ print_forall t)
+
+    | Forall (_, ({ Position.value = PWildcard; _ }, _)) as t ->
+       let rec print_fun = function
+         | Forall (a, ({ Position.value = PWildcard; _ }, c)) ->
+            typ a ^/^ print_fun c.Position.value
+         | t ->
+            U.(doc sarrow) ^/^ term_desc t
+       in
+       group (U.(doc forall) ^/^ print_fun t)
 
     | Let { bound; ty; body = (p, body); } ->
        group
@@ -139,12 +151,14 @@ module PPrint = struct
   and binder kw sep (p, t) =
     def kw sep (pattern p) (term t)
 
-  and hyp p ty =
+  and hyp (p : pattern) ty =
     group (pattern p ^^ space ^^ colon ^/^ typ ty)
 
-  and phrase = function
+  and phrase_desc = function
     | Val (x, ty, t) ->
        def (string "val") equals (hyp (Build.pvar x) ty) (term t)
+
+  and phrase p = Position.located phrase_desc p
 
   and file phrs = separate_map hardline phrase phrs
 end
