@@ -1,4 +1,15 @@
-let encoding : [ `ASCII | `UTF8 ] ref = ref `UTF8
+type encoding =
+  | ASCII
+  | UTF8
+
+let encoding_of_string = function
+  | "ascii" -> Some ASCII
+  | "utf8" -> Some UTF8
+  | _ -> None
+
+let encoding = ref UTF8
+
+let set_encoding s = encoding := s
 
 type t =
   {
@@ -8,8 +19,13 @@ type t =
 
 let string s =
   match !encoding with
-  | `ASCII -> s.ascii
-  | `UTF8 -> s.utf8
+  | ASCII -> s.ascii
+  | UTF8 -> s.utf8
+
+let doc s =
+  match !encoding with
+  | ASCII -> PPrint.string s.ascii
+  | UTF8 -> PPrint.utf8string s.utf8
 
 let make codepoints ascii_fallback =
   { utf8 = Array.map Uchar.of_int codepoints

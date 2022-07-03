@@ -66,11 +66,9 @@ end
 
 module PPrint = struct
   open PPrint
-  module U = UnicodeSymbol
+  module U = UnicodeSigil
 
   let name = string
-
-  let sym s = U.string s |> string
 
   let pattern_desc = function
     | PWildcard -> string "_"
@@ -82,9 +80,9 @@ module PPrint = struct
     | Var x ->
        name x
     | Lam w ->
-       binder (sym U.lambda) (sym U.darrow) w
+       binder U.(doc lambda) U.(doc darrow) w
     | Type ->
-       sym U.typ
+       U.(doc typ)
     | App (t, u) ->
        let rec print_app u = match u.Position.value with
          | App (u1, u2) -> simple_term u1 ^/^ print_app u2
@@ -92,7 +90,7 @@ module PPrint = struct
        in
        simple_term t ^/^ print_app u
     | Nat ->
-       sym U.nat
+       U.(doc nat)
     | Zero ->
        string "zero"
     | Succ ->
@@ -102,9 +100,9 @@ module PPrint = struct
          | Forall (a, (p, c)) ->
             parens (hyp p a) ^/^ print_forall c.Position.value
          | t ->
-            sym U.sarrow ^/^ term_desc t
+            U.(doc sarrow) ^/^ term_desc t
        in
-       group (sym U.forall ^/^ print_forall t)
+       group (U.(doc forall) ^/^ print_forall t)
 
     | Let { bound; ty; body = (p, body); } ->
        prefix 2 1
@@ -113,12 +111,12 @@ module PPrint = struct
     | Natelim { discr; motive; case_zero; case_succ; } ->
        let m = match motive with
          | None -> empty
-         | Some m -> binder (!^ " with") (sym U.darrow) m
+         | Some m -> binder (!^ " with") U.(doc darrow) m
        in
        prefix 2 1
          (group (string "elim" ^/^ term discr ^^ m))
-         (braces (def empty (sym U.darrow) (!^ "zero") (term case_zero)
-                  ^/^ (binder bar (sym U.darrow) case_succ)))
+         (braces (def empty U.(doc darrow) (!^ "zero") (term case_zero)
+                  ^/^ (binder bar U.(doc darrow) case_succ)))
 
   and simple_term_desc = function
     | (Var _ | Type | Nat | Zero | Succ | Forall _) as t ->

@@ -15,7 +15,8 @@ let parse inp =
 let process inp =
   try
     let raw = parse inp in
-    ExtPrint.to_out (Raw.PPrint.file raw)
+    ExtPrint.to_out (Raw.PPrint.file raw);
+    print_newline ()
   with Error.Error err ->
     Format.eprintf "%a@." Error.print err;
     exit 1
@@ -28,6 +29,11 @@ let () =
     (align
        [
          "-stdin", Set process_stdin, " read standard input";
+         "-encoding", Symbol (["utf8"; "ascii"],
+                              fun s -> UnicodeSigil.encoding_of_string s
+                                       |> Option.get
+                                       |> UnicodeSigil.set_encoding),
+         " set output encoding";
        ]
     )
     (fun s -> inputs := `File s :: !inputs)
