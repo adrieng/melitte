@@ -105,9 +105,12 @@ module PPrint = struct
        group (U.(doc forall) ^/^ print_forall t)
 
     | Let { bound; ty; body = (p, body); } ->
-       prefix 2 1
-         (group (string "let" ^/^ hyp p ty ^/^ string " =" ^/^ term bound))
-         (term body)
+       group
+         (
+           (group (!^ "let" ^/^ hyp p ty
+                   ^/^ !^ " =" ^/^ term bound ^/^ !^ "in"))
+           ^/^ term body
+         )
     | Natelim { discr; motive; case_zero; case_succ; } ->
        let m = match motive with
          | None -> empty
