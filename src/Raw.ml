@@ -79,13 +79,13 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ | Forall _) as t ->
+    | (Var _ | Type | Nat | Zero | Succ) as t ->
        simple_term_desc t
 
     | App (t, u) ->
        let rec print_app u = match u.Position.value with
          | App (u1, u2) -> simple_term u1 ^/^ print_app u2
-         | u -> simple_term_desc u
+         | u -> term_desc u
        in
        simple_term t ^/^ print_app u
 
@@ -103,6 +103,24 @@ module PPrint = struct
                    ^/^ !^ " =" ^/^ term bound ^/^ !^ "in"))
            ^/^ term body
          )
+
+    | Forall (_, ({ Position.value = PVar _; _ }, _)) as t ->
+       let rec print_forall = function
+         | Forall (a, ({ Position.value = PVar _; _ } as p, c)) ->
+            parens (hyp p a) ^/^ print_forall c.Position.value
+         | t ->
+            U.(doc sarrow) ^/^ typ_desc t
+       in
+       group (U.(doc forall) ^/^ print_forall t)
+
+    | Forall (_, ({ Position.value = PWildcard; _ }, _)) as t ->
+       let rec print_fun = function
+         | Forall (a, ({ Position.value = PWildcard; _ }, c)) ->
+            typ a ^^ space ^^ U.(doc sarrow) ^/^ print_fun c.Position.value
+         | t ->
+            typ_desc t
+       in
+       group (print_fun t)
 
     | Natelim { discr; motive; case_zero; case_succ; } ->
        let m = match motive with
@@ -130,24 +148,6 @@ module PPrint = struct
     | Succ ->
        string "succ"
 
-    | Forall (_, ({ Position.value = PVar _; _ }, _)) as t ->
-       let rec print_forall = function
-         | Forall (a, ({ Position.value = PVar _; _ } as p, c)) ->
-            parens (hyp p a) ^/^ print_forall c.Position.value
-         | t ->
-            U.(doc sarrow) ^/^ typ_desc t
-       in
-       group (U.(doc forall) ^/^ print_forall t)
-
-    | Forall (_, ({ Position.value = PWildcard; _ }, _)) as t ->
-       let rec print_fun = function
-         | Forall (a, ({ Position.value = PWildcard; _ }, c)) ->
-            typ a ^^ space ^^ U.(doc sarrow) ^/^ print_fun c.Position.value
-         | t ->
-            typ_desc t
-       in
-       group (print_fun t)
-
     | t ->
        parens (term_desc t)
 
@@ -157,7 +157,7 @@ module PPrint = struct
 
   and typ ty = Position.located typ_desc ty
 
-  and typ_desc tyd = simple_term_desc tyd
+  and typ_desc tyd = term_desc tyd
 
   and def kw sep h body =
     prefix 2 1 (group (kw ^^ space ^^ h ^^ space ^^ sep)) body
