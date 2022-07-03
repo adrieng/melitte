@@ -1,4 +1,6 @@
-type name = string [@@deriving show]
+open Sexplib.Std
+
+type name = string [@@deriving show, sexp_of]
 
 type pattern_desc =
   | PWildcard

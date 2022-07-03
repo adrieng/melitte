@@ -2,7 +2,7 @@
  (public_name melitte)
  (name melitte)
  (libraries menhirLib pprint sexplib)
- (preprocess (pps ppx_deriving.show ppx_deriving.ord sedlex.ppx))
+ (preprocess (pps ppx_deriving.show ppx_deriving.ord sedlex.ppx ppx_sexp_conv))
  (promote (until-clean)))
 
 (menhir (modules Parse) (flags --explain --table))

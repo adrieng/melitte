@@ -15,8 +15,12 @@ let parse inp =
 let process inp =
   try
     let raw = parse inp in
+    Printf.printf "{- Raw source code -}\n";
     ExtPrint.to_out (Raw.PPrint.file raw);
-    print_newline ()
+    let syn = Elaborator.(run @@ check raw) in
+    print_newline ();
+    Format.printf "{- Elaborated source code -}@\n%a@?"
+      Sexplib.Sexp.pp_hum (Syntax.sexp_of_t syn);
   with Error.Error err ->
     Format.eprintf "%a@." Error.print err;
     exit 1

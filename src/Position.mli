@@ -49,6 +49,9 @@ val pp_located :
     input location. *)
 val dummy: t
 
+(** [of_sexp s] converts from an S-expression. *)
+val sexp_of_t : t -> Sexplib.Sexp.t
+
 (** [map f v] extends the decoration from [v] to [f v]. *)
 val map: ('a -> 'b) -> 'a located -> 'b located
 

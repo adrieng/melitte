@@ -67,3 +67,5 @@ module PPrint : sig
   val phrase : phrase -> PPrint.document
   val file : t -> PPrint.document
 end
+
+val sexp_of_name : name -> Sexplib.Sexp.t

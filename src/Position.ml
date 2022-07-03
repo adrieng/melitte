@@ -7,15 +7,16 @@ type lexing_position = Lexing.position
 (*   |> fun (pos_fname, pos_lnum, pos_bol, pos_cnum) -> *)
 (*      { pos_fname; pos_lnum; pos_bol; pos_cnum } *)
 
-(* let sexp_of_lexing_position p = *)
-(*   [%sexp_of: string * int * int * int] *)
-(*   (p.pos_fname, p.pos_lnum, p.pos_bol, p.pos_cnum) *)
+let sexp_of_lexing_position p =
+  let open Sexplib.Std in
+  [%sexp_of: string * int * int * int]
+  (p.pos_fname, p.pos_lnum, p.pos_bol, p.pos_cnum)
 
 type t =
     {
       start_p : lexing_position;
-      end_p   : lexing_position
-    }
+      end_p   : lexing_position;
+    } [@@deriving sexp_of]
 
 type position = t
 

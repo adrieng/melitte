@@ -1,53 +1,15 @@
   $ melitte simple.melitte
-  [(Raw.Val ("x", Raw.Type, Raw.Nat));
-    (Raw.Val ("three", (Raw.Var "x"),
-       (Raw.App (Raw.Succ, (Raw.App (Raw.Succ, (Raw.App (Raw.Succ, Raw.Zero))))
-          ))
-       ));
-    (Raw.Val ("const", (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat))),
-       (Raw.Lam ((Raw.PVar "x"), Raw.Zero))));
-    (Raw.Val ("id",
-       (Raw.Forall (Raw.Type,
-          ((Raw.PVar "A"),
-           (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))))
-          )),
-       (Raw.Lam ((Raw.PVar "A"), (Raw.Lam ((Raw.PVar "x"), (Raw.Var "x")))))));
-    (Raw.Val ("iter",
-       (Raw.Forall (Raw.Type,
-          ((Raw.PVar "A"),
-           (Raw.Forall (
-              (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))),
-              ((Raw.PVar "f"),
-               (Raw.Forall (Raw.Nat,
-                  (Raw.PWildcard,
-                   (Raw.Forall ((Raw.Var "A"), (Raw.PWildcard, (Raw.Var "A")))))
-                  )))
-              )))
-          )),
-       (Raw.Lam
-          ((Raw.PVar "A"),
-           (Raw.Lam
-              ((Raw.PVar "f"),
-               (Raw.Lam
-                  ((Raw.PVar "n"),
-                   (Raw.Lam
-                      ((Raw.PVar "z"),
-                       Raw.Natelim {discr = (Raw.Var "n"); motive = None;
-                         case_zero = (Raw.Var "z");
-                         case_succ =
-                         ((Raw.PVar "r"),
-                          (Raw.App ((Raw.Var "f"), (Raw.Var "r"))))}))))))))
-       ));
-    (Raw.Val ("add",
-       (Raw.Forall (Raw.Nat,
-          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
-       (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, Raw.Succ))))));
-    (Raw.Val ("mul",
-       (Raw.Forall (Raw.Nat,
-          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
-       (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, (Raw.Var "add")))))));
-    (Raw.Val ("exp",
-       (Raw.Forall (Raw.Nat,
-          (Raw.PWildcard, (Raw.Forall (Raw.Nat, (Raw.PWildcard, Raw.Nat)))))),
-       (Raw.App ((Raw.Var "iter"), (Raw.App (Raw.Nat, (Raw.Var "mul")))))))
-    ]
+  {- Raw source code -}
+  val x : 𝕌 = ℕ
+  val three : x = succ succ succ zero
+  val const : ℕ → ℕ = λ x ⇒ zero
+  val id : ∀ (A : 𝕌) → A → A = λ A x ⇒ x
+  val iter : ∀ (A : 𝕌) (f : A → A) → ℕ → A → A =
+    λ A f n z ⇒ elim n { zero ⇒ z | r ⇒ f r}
+  val add : ℕ → ℕ → ℕ = iter ℕ succ
+  val mul : ℕ → ℕ → ℕ = iter ℕ add
+  val exp : ℕ → ℕ → ℕ = iter ℕ mul
+  val exp_n : ℕ → 𝕌 =
+    let exp_once : 𝕌 → 𝕌  = λ t ⇒ ℕ → t in iter (ℕ → 𝕌) exp_once n ℕ
+  {- Elaborated source code -}
+  ()
