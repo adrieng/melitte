@@ -79,42 +79,22 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | Var x ->
-       name x
-    | Lam w ->
-       binder U.(doc lambda) U.(doc darrow) w
-    | Type ->
-       U.(doc typ)
+    | (Var _ | Type | Nat | Zero | Succ | Forall _) as t ->
+       simple_term_desc t
+
     | App (t, u) ->
        let rec print_app u = match u.Position.value with
          | App (u1, u2) -> simple_term u1 ^/^ print_app u2
          | u -> simple_term_desc u
        in
        simple_term t ^/^ print_app u
-    | Nat ->
-       U.(doc nat)
-    | Zero ->
-       string "zero"
-    | Succ ->
-       string "succ"
 
-    | Forall (_, ({ Position.value = PVar _; _ }, _)) as t ->
-       let rec print_forall = function
-         | Forall (a, ({ Position.value = PVar _; _ } as p, c)) ->
-            parens (hyp p a) ^/^ print_forall c.Position.value
-         | t ->
-            U.(doc sarrow) ^/^ term_desc t
+    | Lam _ as t ->
+       let rec print_lam = function
+         | Lam (p, t) -> pattern p ^/^ print_lam t.Position.value
+         | t -> U.(doc darrow) ^/^ term_desc t
        in
-       group (U.(doc forall) ^/^ print_forall t)
-
-    | Forall (_, ({ Position.value = PWildcard; _ }, _)) as t ->
-       let rec print_fun = function
-         | Forall (a, ({ Position.value = PWildcard; _ }, c)) ->
-            typ a ^/^ print_fun c.Position.value
-         | t ->
-            U.(doc sarrow) ^/^ term_desc t
-       in
-       group (U.(doc forall) ^/^ print_fun t)
+       group (U.(doc lambda) ^/^ print_lam t)
 
     | Let { bound; ty; body = (p, body); } ->
        group
@@ -123,6 +103,7 @@ module PPrint = struct
                    ^/^ !^ " =" ^/^ term bound ^/^ !^ "in"))
            ^/^ term body
          )
+
     | Natelim { discr; motive; case_zero; case_succ; } ->
        let m = match motive with
          | None -> empty
@@ -134,8 +115,39 @@ module PPrint = struct
                   ^/^ (binder bar U.(doc darrow) case_succ)))
 
   and simple_term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ | Forall _) as t ->
-       term_desc t
+    | Var x ->
+       name x
+
+    | Type ->
+       U.(doc typ)
+
+    | Nat ->
+       U.(doc nat)
+
+    | Zero ->
+       string "zero"
+
+    | Succ ->
+       string "succ"
+
+    | Forall (_, ({ Position.value = PVar _; _ }, _)) as t ->
+       let rec print_forall = function
+         | Forall (a, ({ Position.value = PVar _; _ } as p, c)) ->
+            parens (hyp p a) ^/^ print_forall c.Position.value
+         | t ->
+            U.(doc sarrow) ^/^ typ_desc t
+       in
+       group (U.(doc forall) ^/^ print_forall t)
+
+    | Forall (_, ({ Position.value = PWildcard; _ }, _)) as t ->
+       let rec print_fun = function
+         | Forall (a, ({ Position.value = PWildcard; _ }, c)) ->
+            typ a ^^ space ^^ U.(doc sarrow) ^/^ print_fun c.Position.value
+         | t ->
+            typ_desc t
+       in
+       group (print_fun t)
+
     | t ->
        parens (term_desc t)
 
@@ -143,7 +155,9 @@ module PPrint = struct
 
   and simple_term t = Position.located simple_term_desc t
 
-  and typ ty = term ty
+  and typ ty = Position.located typ_desc ty
+
+  and typ_desc tyd = simple_term_desc tyd
 
   and def kw sep h body =
     prefix 2 1 (group (kw ^^ space ^^ h ^^ space ^^ sep)) body
