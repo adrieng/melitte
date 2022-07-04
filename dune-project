@@ -19,4 +19,5 @@
  (name melitte)
  (synopsis "A toy implementation of Martin-Löf Type Theory")
  (description "")
- (depends (ocaml (> 4.14.0)) dune pprint menhir ppx_deriving sexplib sedlex))
+ (depends (ocaml (> 4.14.0)) dune pprint menhir sedlex ppx_deriving sexplib
+           ppx_sexp_conv))

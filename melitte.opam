@@ -13,9 +13,10 @@ depends: [
   "dune" {>= "3.2"}
   "pprint"
   "menhir"
+  "sedlex"
   "ppx_deriving"
   "sexplib"
-  "sedlex"
+  "ppx_sexp_conv"
   "odoc" {with-doc}
 ]
 build: [
