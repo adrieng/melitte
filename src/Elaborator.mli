@@ -5,4 +5,6 @@
 
 include Monad.Runnable
 
+type value
+
 val check : Raw.t -> Syntax.t t

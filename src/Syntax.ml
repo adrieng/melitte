@@ -7,6 +7,15 @@ type term_desc =
   | Lam of bound1
   | App of term * term
   | Forall of term * bound1
+  | Let of term * term * bound1
+  | Type
+  | Nat
+  | Zero
+  | Succ
+  | Natelim of { discr : term;
+                 motive : bound1 option;
+                 case_zero : term;
+                 case_succ : bound1; }
 
 and term =
   {
