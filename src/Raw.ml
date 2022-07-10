@@ -86,7 +86,7 @@ module PPrint = struct
 
     | App (t, u) ->
        let rec print_app u = match u.Position.value with
-         | App (u1, u2) -> simple_term u1 ^/^ print_app u2
+         | App (u1, u2) -> print_app u1 ^/^ simple_term u2
          | u -> term_desc u
        in
        simple_term t ^/^ print_app u

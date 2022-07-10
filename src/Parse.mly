@@ -14,7 +14,6 @@
 
 %nonassoc IN DARR
 %right ARR
-%nonassoc APP
 
 %start<Raw.t> file
 
@@ -29,13 +28,20 @@
 %inline name:
 | id = ID { id }
 
-simple_term_:
+very_simple_term_:
 | id = name { Var id }
 | TYPE { Type }
 | NAT { Nat }
 | ZERO { Zero }
-| SUCC t = simple_term { Succ t }
+| SUCC t = very_simple_term { Succ t }
 | te = parens(term_) { te }
+
+%inline very_simple_term:
+| located(very_simple_term_) { $1 }
+
+simple_term_:
+| te = very_simple_term_ { te }
+| f = simple_term a = very_simple_term { App (f, a) }
 
 %inline simple_term:
 | located(simple_term_) { $1 }
@@ -49,7 +55,6 @@ motive:
 term_:
 | t = simple_term_ { t }
 | LAM ids = pattern+ DARR t = term { v @@ Build.lambda ids t }
-| f = simple_term a = term %prec APP { App (f, a) }
 | LET p = pattern COLON ty = ty EQ bound = term IN body = term
   { Let { bound; ty; body = (p, body); } }
 | FORALL hyps = parens(hyp)+ ARR b = ty { v @@ Build.forall hyps b }
