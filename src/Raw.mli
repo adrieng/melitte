@@ -54,6 +54,8 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build : sig
+  val pvar : name -> pattern
+  val var : name -> term
   val lambda : pattern list -> term -> term
   val forall : (pattern * ty) list -> ty -> ty
   val succ : term -> term

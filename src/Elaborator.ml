@@ -118,7 +118,7 @@ and eval_nat_elim d m u0 uN =
   | Reflect { typ = Nat; tm; } ->
      Reflect { typ = Nat; tm = Natelim (tm, m, u0, uN); }
   | _ ->
-     assert false
+     assert false               (* type error *)
 
 and eval_clo (C (p, t, env)) v = eval t (Env.extend p v env)
 

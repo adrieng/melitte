@@ -1,9 +1,9 @@
 open Sexplib.Std
 
-type name = int [@@deriving sexp_of]
+type idx = int [@@deriving sexp_of]
 
 type term_desc =
-  | Var of name
+  | Var of idx
   | Lam of bound1
   | App of term * term
   | Forall of term * bound1
@@ -11,7 +11,7 @@ type term_desc =
   | Type
   | Nat
   | Zero
-  | Succ
+  | Succ of term
   | Natelim of { discr : term;
                  motive : bound1 option;
                  case_zero : term;
@@ -39,3 +39,79 @@ and phrase =
   }
 
 and t = phrase list [@@deriving sexp_of]
+
+module Env = struct
+  type t = E of Raw.name list * int
+
+  let initial = E ([], 0)
+
+  let lookup : t -> int -> Raw.name =
+    fun (E (names, _)) i ->
+    try List.nth names i
+    with Not_found -> "_x" ^ string_of_int @@ (i - List.length names)
+
+  let extend : t -> Raw.name option -> Raw.name * t =
+    fun (E (names, cpt)) u ->
+    let name, cpt =
+      match u with
+      | Some name -> name, cpt
+      | None -> "_y" ^ string_of_int cpt, cpt + 1
+    in
+    name, E (name :: names, cpt)
+end
+
+let rec raw_of_desc env = function
+  | Var i ->
+     Raw.Var (Env.lookup env i)
+  | Lam b ->
+     Raw.Lam (weakened_of_bound1 env b)
+  | App (t, u) ->
+     Raw.App (raw_of env t, raw_of env u)
+  | Forall (t, u) ->
+     Raw.Forall (raw_of env t, weakened_of_bound1 env u)
+  | Let _ ->
+     assert false               (* TODO *)
+  | Type ->
+     Raw.Type
+  | Nat ->
+     Raw.Nat
+  | Zero ->
+     Raw.Zero
+  | Succ t ->
+     Raw.Succ (raw_of env t)
+  | Natelim { discr; motive; case_zero; case_succ; } ->
+     Raw.Natelim { discr = raw_of env discr;
+                   motive = Option.map (weakened_of_bound1 env) motive;
+                   case_zero = raw_of env case_zero;
+                   case_succ = weakened_of_bound1 env case_succ; }
+
+and raw_of env { t_desc; t_loc; } =
+  Position.{ value = raw_of_desc env t_desc; position = t_loc; }
+
+and weakened_of_bound1 env (Bound1 { body; user; }) =
+  let name, env = Env.extend env user in
+  Raw.Build.pvar name, raw_of env body
+
+let rec raw_of_phrase_desc env = function
+  | Val (name, ty, body) ->
+     let _, new_env = Env.extend env (Some name) in
+     new_env, Raw.Val (name, raw_of env ty, raw_of new_env body)
+
+and raw_of_phrase env { ph_desc; ph_loc; } =
+  let env, ph_desc = raw_of_phrase_desc env ph_desc in
+  env, Position.{ value = ph_desc; position = ph_loc; }
+
+let raw_of_file env phs = List.fold_left_map raw_of_phrase env phs
+
+module PPrint = struct
+  let term te =
+    Raw.PPrint.term (raw_of Env.initial te)
+
+  let phrase ph =
+    let _, raw = raw_of_phrase Env.initial ph in
+    Raw.PPrint.phrase raw
+
+  let file phs =
+    let _, raw = raw_of_file Env.initial phs in
+    Raw.PPrint.file raw
+end

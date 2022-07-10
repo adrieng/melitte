@@ -4,10 +4,10 @@
 
 (** At this level, names are DeBruijn indices. *)
 
-type name = int
+type idx = int
 
 type term_desc =
-  | Var of name
+  | Var of idx
   | Lam of bound1
   | App of term * term
   | Forall of term * bound1
@@ -15,7 +15,7 @@ type term_desc =
   | Type
   | Nat
   | Zero
-  | Succ
+  | Succ of term
   | Natelim of { discr : term;
                  motive : bound1 option;
                  case_zero : term;
@@ -45,3 +45,9 @@ and phrase =
 and t = phrase list
 
 val sexp_of_t : t -> Sexplib.Sexp.t
+
+module PPrint : sig
+  val term : term -> PPrint.document
+  val phrase : phrase -> PPrint.document
+  val file : t -> PPrint.document
+end
