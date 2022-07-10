@@ -34,7 +34,7 @@ type term_desc =
   (** Type of natural numbers. *)
   | Zero
   (** Nullary constructor of [Nat]. *)
-  | Succ
+  | Succ of term
   (** Unary constructor of [Nat]. *)
   | Natelim of { discr : term;
                  motive : term weakened option;
@@ -56,6 +56,7 @@ type t = phrase list
 module Build : sig
   val lambda : pattern list -> term -> term
   val forall : (pattern * ty) list -> ty -> ty
+  val succ : term -> term
   val arrow : ty -> ty -> ty
 end
 

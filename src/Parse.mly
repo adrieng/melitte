@@ -34,7 +34,7 @@ simple_term_:
 | TYPE { Type }
 | NAT { Nat }
 | ZERO { Zero }
-| SUCC { Succ }
+| SUCC t = simple_term { Succ t }
 | te = parens(term_) { te }
 
 %inline simple_term:

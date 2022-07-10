@@ -19,7 +19,7 @@ and term_desc =
              ty : ty;
              body : term weakened; }
   | Type
-  | Nat | Zero | Succ
+  | Nat | Zero | Succ of term
   | Natelim of { discr : term;
                  motive : term weakened option;
                  case_zero : term;
@@ -44,7 +44,7 @@ module Build = struct
     Position.unknown_pos (Var id)
 
   let succ t =
-    Position.{ value = App (unknown_pos Succ, t);
+    Position.{ value = Succ t;
                position = t.position; }
 
   let lambda ids body =
@@ -81,7 +81,7 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ) as t ->
+    | (Var _ | Type | Nat | Zero | Succ _) as t ->
        simple_term_desc t
 
     | App (t, u) ->
@@ -147,8 +147,8 @@ module PPrint = struct
     | Zero ->
        string "zero"
 
-    | Succ ->
-       string "succ"
+    | Succ t ->
+       prefix 2 1 (!^ "succ") (simple_term t)
 
     | t ->
        parens (term_desc t)

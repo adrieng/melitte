@@ -36,7 +36,7 @@ type value =
 and neutral =
   | Var of int
   | App of neutral * normal
-  | Natrec of neutral * clo * value * clo
+  | Natelim of neutral * clo option * value * clo
 
 and normal =
   | Reify of { typ : value; tm : value; }
@@ -60,7 +60,7 @@ module Infix = Monad.Notation (M)
 
 include M
 
-let close (p, t) env = C (p, t, env)
+let close env (p, t) = C (p, t, env)
 
 let rec eval : Raw.term -> env -> value =
   fun t env ->
@@ -69,16 +69,16 @@ let rec eval : Raw.term -> env -> value =
      Env.lookup t.Position.position x env
 
   | Raw.Lam t ->
-     Lam (close t env)
+     Lam (close env t)
 
   | Raw.App (t, u) ->
      eval_app (eval t env) (eval u env)
 
   | Raw.Forall (a, b) ->
-     Forall (eval a env, close b env)
+     Forall (eval a env, close env b)
 
-  | Raw.Let _ ->
-     assert false               (* TODO *)
+  | Raw.Let { bound; body; _ } ->
+     eval_clo (close env body) (eval bound env)
 
   | Raw.Type ->
      Type
@@ -89,11 +89,16 @@ let rec eval : Raw.term -> env -> value =
   | Raw.Zero ->
      Zero
 
-  | Raw.Succ ->
-     assert false               (* TODO *)
+  | Raw.Succ t ->
+     Succ (eval t env)
 
-  | Raw.Natelim _ ->
-     assert false
+  | Raw.Natelim { discr; motive; case_zero; case_succ; } ->
+     let motive = Option.map (close env) motive in
+     eval_nat_elim
+       (eval discr env)
+       motive
+       (eval case_zero env)
+       (close env case_succ)
 
 and eval_app v w =
   match v with
@@ -101,6 +106,17 @@ and eval_app v w =
      eval_clo c w
   | Reflect { typ = Forall (a, b); tm; } ->
      Reflect { typ = eval_clo b w; tm = App (tm, Reify { typ = a; tm = w; }); }
+  | _ ->
+     assert false               (* type error *)
+
+and eval_nat_elim d m u0 uN =
+  match d with
+  | Zero ->
+     u0
+  | Succ n ->
+     eval_clo uN n
+  | Reflect { typ = Nat; tm; } ->
+     Reflect { typ = Nat; tm = Natelim (tm, m, u0, uN); }
   | _ ->
      assert false
 
