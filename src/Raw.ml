@@ -81,15 +81,8 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ _) as t ->
+    | (Var _ | Type | Nat | Zero | Succ _ | App _) as t ->
        simple_term_desc t
-
-    | App (t, u) ->
-       let rec print_app u = match u.Position.value with
-         | App (u1, u2) -> print_app u1 ^/^ simple_term u2
-         | u -> term_desc u
-       in
-       simple_term t ^/^ print_app u
 
     | Lam _ as t ->
        let rec print_lam = function
@@ -135,6 +128,16 @@ module PPrint = struct
                   ^/^ (binder bar U.(doc darrow) case_succ)))
 
   and simple_term_desc = function
+    | (Var _ | Type | Nat | Zero | Succ _) as t ->
+       very_simple_term_desc t
+
+    | App (t, u) ->
+       simple_term t ^/^ very_simple_term u
+
+    | _ ->
+       assert false
+
+  and very_simple_term_desc = function
     | Var x ->
        name x
 
@@ -156,6 +159,8 @@ module PPrint = struct
   and term t : PPrint.document = Position.located term_desc t
 
   and simple_term t = Position.located simple_term_desc t
+
+  and very_simple_term t = Position.located very_simple_term_desc t
 
   and typ ty = Position.located typ_desc ty
 
