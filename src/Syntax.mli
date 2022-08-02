@@ -2,7 +2,7 @@
 
 (** This module defines well-typed syntax, as produced by the elaborator. *)
 
-(** At this level, names are DeBruijn indices. *)
+(** At this level, names are De Bruijn indices. *)
 
 type idx = int
 

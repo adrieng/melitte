@@ -122,5 +122,36 @@ and eval_nat_elim d m u0 uN =
 
 and eval_clo (C (p, t, env)) v = eval t (Env.extend p v env)
 
+let rec quote_ne : neutral -> unit Env.t -> Syntax.term =
+  fun v env ->
+  let t_desc =
+    match v with
+    | Var k ->
+       Syntax.Var (env.Env.len - (k + 1))
+    | App (ne, nf) ->
+       Syntax.App (quote_ne ne env, quote_nf nf env)
+    | Natelim (discr, motive_opt, case_zero, case_succ) ->
+       let discr = quote_ne discr n in
+       let motive = assert false in
+       let case_zero = quote_nf case_zero n in
+       let case_succ = assert false in
+       Syntax.Natelim { discr; motive; case_zero; case_succ; }
+  in
+  { t_desc; t_loc = Position.dummy; }
+
+and quote_nf : normal -> int -> Syntax.term =
+  fun (Reify { typ; tm; }) n ->
+  match tm with
+  | Lam _ ->
+     assert false
+  | Type ->
+     Syntax.Type
+  | Nat ->
+     Syntax.Nat
+  | Zero ->
+     Syntax.Zero
+  | Succ tm ->
+     Syntax.Succ (quote_nf (Reify { typ; tm; }) n)
+
 let check : Raw.t -> Syntax.t t =
   fun _r -> return []
