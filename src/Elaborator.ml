@@ -1,31 +1,29 @@
+module R = Raw
 module S = Syntax
 
 module Env = struct
-  type 'a t = { len : int;
-                names : [`Name of string * 'a | `Wildcard] list; }
+  type 'a t = { len : int; names : (R.pattern_desc * 'a) list; }
 
-  let initial = { len = 0; names = []; }
+  let empty = { len = 0; names = []; }
 
   let lookup pos x env =
     let rec loop env =
       match env with
       | [] -> Error.unbound_identifier pos x
-      | `Wildcard :: env -> loop env
-      | `Name (y, v) :: env -> if x = y then v else loop env
+      | (R.PWildcard, _) :: env -> loop env
+      | (R.PVar y, v) :: env -> if x = y then v else loop env
     in
     loop env.names
 
   let extend p v env =
-    {
-      len = env.len + 1;
-      names = (match p.Position.value with
-               | Raw.PWildcard -> `Wildcard
-               | Raw.PVar x -> `Name (x, v)) :: env.names;
-    }
+    { len = env.len + 1; names = (p, v) :: env.names; }
+
+  let map f env =
+    { env with names = List.map (function (p, v) -> (p, f v)) env.names; }
 end
 
 type value =
-  | Reflect of { typ : value; tm : neutral; }
+  | Reflect of { ty : value; tm : neutral; }
   | Lam of clo
   | Forall of value * clo
   | Type
@@ -39,9 +37,9 @@ and neutral =
   | Natelim of neutral * clo * value * clo
 
 and normal =
-  | Reify of { typ : value; tm : value; }
+  | Reify of { ty : value; tm : value; }
 
-and clo = C of Raw.pattern * Raw.term * value Env.t
+and clo = C of R.pattern * R.term * value Env.t
 
 and env = value Env.t
 
@@ -53,7 +51,7 @@ module M = struct
   let bind (type a b) (x : a t) (f : a -> b t) : b t =
     fun env -> let y, env = x env in f y env
 
-  let run x = let y, _ = x Env.initial in y
+  let run x = let y, _ = x Env.empty in y
 end
 
 module Infix = Monad.Notation (M)
@@ -64,37 +62,37 @@ include M
 
 let close env (p, t) = C (p, t, env)
 
-let rec eval : Raw.term -> env -> value =
+let rec eval : R.term -> env -> value =
   fun t env ->
   match t.Position.value with
-  | Raw.Var x ->
+  | R.Var x ->
      Env.lookup t.Position.position x env
 
-  | Raw.Lam t ->
+  | R.Lam t ->
      Lam (close env t)
 
-  | Raw.App (t, u) ->
+  | R.App (t, u) ->
      eval_app (eval t env) (eval u env)
 
-  | Raw.Forall (a, b) ->
+  | R.Forall (a, b) ->
      Forall (eval a env, close env b)
 
-  | Raw.Let { bound; body; _ } ->
+  | R.Let { bound; body; _ } ->
      eval_clo (close env body) (eval bound env)
 
-  | Raw.Type ->
+  | R.Type ->
      Type
 
-  | Raw.Nat ->
+  | R.Nat ->
      Nat
 
-  | Raw.Zero ->
+  | R.Zero ->
      Zero
 
-  | Raw.Succ t ->
+  | R.Succ t ->
      Succ (eval t env)
 
-  | Raw.Natelim { discr; motive; case_zero; case_succ; } ->
+  | R.Natelim { discr; motive; case_zero; case_succ; } ->
      eval_nat_elim
        (eval discr env)
        (close env motive)
@@ -105,8 +103,8 @@ and eval_app v w =
   match v with
   | Lam c ->
      eval_clo c w
-  | Reflect { typ = Forall (a, b); tm; } ->
-     Reflect { typ = eval_clo b w; tm = App (tm, Reify { typ = a; tm = w; }); }
+  | Reflect { ty = Forall (a, b); tm; } ->
+     Reflect { ty = eval_clo b w; tm = App (tm, Reify { ty = a; tm = w; }); }
   | _ ->
      assert false               (* type error *)
 
@@ -116,68 +114,58 @@ and eval_nat_elim d m u0 uN =
      u0
   | Succ n ->
      eval_clo uN n
-  | Reflect { typ = Nat; tm; } ->
-     Reflect { typ = Nat; tm = Natelim (tm, m, u0, uN); }
+  | Reflect { ty = Nat; tm; } ->
+     Reflect { ty = Nat; tm = Natelim (tm, m, u0, uN); }
   | _ ->
      assert false               (* type error *)
 
-and eval_clo (C (p, t, env)) v = eval t (Env.extend p v env)
+and eval_clo (C (p, t, env)) v = eval t (Env.extend p.value v env)
 
 (* {2 Quotation} *)
 
-type quote_env = unit Env.t
+let fresh ty n = Reflect { ty; tm = Var n; }, n + 1
 
-let quote_bind a env =
-  Reflect { typ = a; tm = Var env.Env.len; },
-  Env.extend Position.(unknown_pos Raw.PWildcard) () env
-
-let rec quote_ne : neutral -> quote_env -> Syntax.term =
-  fun v env ->
+let rec quote_ne : neutral -> int -> S.term =
+  fun v n ->
   let t_desc =
     match v with
     | Var k ->
-       Syntax.Var (env.Env.len - (k + 1))
+       S.Var (n - (k + 1))
 
     | App (ne, nf) ->
-       Syntax.App (quote_ne ne env, quote_nf nf env)
+       S.App (quote_ne ne n, quote_nf nf n)
 
     | Natelim (discr, motive, case_zero, case_succ) ->
-       let discr = quote_ne discr env in
-       let case_zero = quote_nf (Reify { typ = eval_clo motive Zero;
-                                         tm = case_zero; }) env in
-       let case_succ =
-         quote_bound (fun x -> quote_nf (Reify { typ = eval_clo motive x;
-                                                 tm = eval_clo case_succ x; }))
-           Nat env
-       in
-       let motive =
-         quote_bound (fun x -> quote_ty (eval_clo motive x)) Nat env
-       in
-       Syntax.Natelim { discr; motive; case_zero; case_succ; }
+       let discr = quote_ne discr n in
+       let case_zero = quote_nf (Reify { ty = eval_clo motive Zero;
+                                         tm = case_zero; }) n in
+       let case_succ = quote_clo_nf ~bound_ty:Nat ~ty:motive case_succ n in
+       let motive = quote_clo_ty ~bound_ty:Nat motive n in
+       S.Natelim { discr; motive; case_zero; case_succ; }
   in
-  Syntax.{ t_desc; t_loc = Position.dummy; }
+  S.{ t_desc; t_loc = Position.dummy; }
 
-and quote_nf : normal -> unit Env.t -> Syntax.term =
-  fun (Reify { typ; tm; }) env ->
-  let mk t_desc = Syntax.{ t_desc; t_loc = Position.dummy; } in
-  match typ, tm with
+and quote_nf : normal -> int -> S.term =
+  fun (Reify { ty; tm; }) n ->
+  match ty, tm with
   | _, Reflect { tm; _ } ->
-     quote_ne tm env
+     quote_ne tm n
 
   | Type, _ ->
-     quote_ty tm env
+     quote_ty tm n
 
-  | Forall (a, f), _ ->
-     let quote_body x =
-       quote_nf (Reify { typ = eval_clo f x; tm = eval_app tm x; })
-     in
-     mk (Syntax.Lam (quote_bound quote_body a env))
+  | Forall (a, f), v ->
+     let x, n = fresh a n in
+     S.Build.lam
+       (Bound1 { body = quote_nf (Reify { ty = eval_clo f x;
+                                          tm = eval_app v x; }) n;
+                 user = None; })
 
   | Nat, Zero ->
-     Syntax.Build.zero
+     S.Build.zero
 
   | Nat, Succ tm ->
-     Syntax.Build.succ (quote_nf (Reify { typ; tm; }) env)
+     S.Build.succ (quote_nf (Reify { ty; tm; }) n)
 
   | _, Lam _ ->
      assert false             (* eliminated by η-expansion  *)
@@ -185,28 +173,52 @@ and quote_nf : normal -> unit Env.t -> Syntax.term =
   | _ ->
      assert false             (* ill-typed *)
 
-and quote_ty : value -> unit Env.t -> Syntax.term =
-  fun v env ->
+and quote_ty : value -> int -> S.term =
+  fun v n ->
   let t_desc =
     match v with
     | Type ->
-       Syntax.Type
+       S.Type
 
     | Nat ->
-       Syntax.Nat
+       S.Nat
 
     | Forall (a, f) ->
-       Syntax.Forall (quote_ty a env,
-                      quote_bound (fun x -> quote_ty (eval_clo f x)) a env)
+       S.Forall (quote_ty a n, quote_clo_ty f ~bound_ty:a n)
 
     | Reflect _ | Zero | Succ _ | Lam _ ->
        invalid_arg "quote_ty"
   in
   { t_desc; t_loc = Position.dummy; }
 
-and quote_bound f a env =
-  let x, env = quote_bind a env in
-  Syntax.Bound1 { body = f x env; user = None; }
+and quote_clo_ty ~bound_ty clo n =
+  let x, n = fresh bound_ty n in
+  S.Bound1 { body = quote_ty (eval_clo clo x) n; user = None; }
 
-let check : Raw.t -> Syntax.t t =
+and quote_clo_nf ~bound_ty ~ty clo env =
+  let x, n = fresh bound_ty env in
+  S.Bound1 { body = quote_nf (Reify { ty = eval_clo ty x;
+                                      tm = eval_clo clo x; }) n;
+                  user = None; }
+
+(* {2 Normalization} *)
+
+let reflect_cx : R.ty Env.t -> value Env.t =
+  fun Env.{ len; names; } ->
+  let rec loop len names =
+    match names with
+    | [] -> Env.empty
+    | (p, a) :: names ->
+       let env = loop (len - 1) names in
+       Env.extend p (Reflect { ty = eval a env; tm = Var len; }) env
+  in
+  loop len names
+
+let nf ~env ~ty t =
+  let env = reflect_cx env in
+  quote_nf (Reify { ty = eval ty env; tm = eval t env; }) env.len
+
+(* {2 Type checking} *)
+
+let check : R.t -> S.t t =
   fun _r -> return []

@@ -44,6 +44,8 @@ and phrase =
 
 and t = phrase list
 
+type ty = term
+
 val sexp_of_t : t -> Sexplib.Sexp.t
 
 module Build : sig

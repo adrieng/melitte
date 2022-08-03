@@ -40,6 +40,8 @@ and phrase =
 
 and t = phrase list [@@deriving sexp_of]
 
+type ty = term
+
 module Env = struct
   type t = E of Raw.name list * int
 
