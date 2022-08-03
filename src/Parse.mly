@@ -59,7 +59,7 @@ term_:
   { Let { bound; ty; body = (p, body); } }
 | FORALL hyps = parens(hyp)+ ARR b = ty { v @@ Build.forall hyps b }
 | a = term ARR b = term { v @@ Build.arrow a b }
-| ELIM discr = term motive = motive?
+| ELIM discr = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term
   BAR SUCC case_succ = binding(DARR)

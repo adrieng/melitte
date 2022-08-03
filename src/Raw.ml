@@ -21,7 +21,7 @@ and term_desc =
   | Type
   | Nat | Zero | Succ of term
   | Natelim of { discr : term;
-                 motive : term weakened option;
+                 motive : term weakened;
                  case_zero : term;
                  case_succ : term weakened; }
 
@@ -118,10 +118,7 @@ module PPrint = struct
        group (print_fun t)
 
     | Natelim { discr; motive; case_zero; case_succ; } ->
-       let m = match motive with
-         | None -> empty
-         | Some m -> binder (!^ " with") U.(doc darrow) m
-       in
+       let m = binder (!^ " with") U.(doc darrow) motive in
        prefix 2 1
          (group (string "elim" ^/^ term discr ^^ m))
          (braces (def empty U.(doc darrow) (!^ "zero") (term case_zero)

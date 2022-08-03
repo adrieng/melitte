@@ -13,7 +13,7 @@ type term_desc =
   | Zero
   | Succ of term
   | Natelim of { discr : term;
-                 motive : bound1 option;
+                 motive : bound1;
                  case_zero : term;
                  case_succ : bound1; }
 
@@ -81,7 +81,7 @@ let rec raw_of_desc env = function
      Raw.Succ (raw_of env t)
   | Natelim { discr; motive; case_zero; case_succ; } ->
      Raw.Natelim { discr = raw_of env discr;
-                   motive = Option.map (weakened_of_bound1 env) motive;
+                   motive = weakened_of_bound1 env motive;
                    case_zero = raw_of env case_zero;
                    case_succ = weakened_of_bound1 env case_succ; }
 
@@ -102,6 +102,14 @@ and raw_of_phrase env { ph_desc; ph_loc; } =
   env, Position.{ value = ph_desc; position = ph_loc; }
 
 let raw_of_file env phs = List.fold_left_map raw_of_phrase env phs
+
+module Build = struct
+  let lam bound = { t_desc = Lam bound; t_loc = Position.dummy; }
+
+  let zero = { t_desc = Zero; t_loc = Position.dummy; }
+
+  let succ t = { t_desc = Succ t; t_loc = Position.dummy; }
+end
 
 module PPrint = struct
   let term te =

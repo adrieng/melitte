@@ -17,7 +17,7 @@ type term_desc =
   | Zero
   | Succ of term
   | Natelim of { discr : term;
-                 motive : bound1 option;
+                 motive : bound1;
                  case_zero : term;
                  case_succ : bound1; }
 
@@ -45,6 +45,12 @@ and phrase =
 and t = phrase list
 
 val sexp_of_t : t -> Sexplib.Sexp.t
+
+module Build : sig
+  val lam : bound1 -> term
+  val zero : term
+  val succ : term -> term
+end
 
 module PPrint : sig
   val term : term -> PPrint.document

@@ -37,7 +37,7 @@ type term_desc =
   | Succ of term
   (** Unary constructor of [Nat]. *)
   | Natelim of { discr : term;
-                 motive : term weakened option;
+                 motive : term weakened;
                  case_zero : term;
                  case_succ : term weakened; }
                  (** Dependent elimination form for natural numbers. *)

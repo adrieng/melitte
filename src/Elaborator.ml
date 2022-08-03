@@ -36,7 +36,7 @@ type value =
 and neutral =
   | Var of int
   | App of neutral * normal
-  | Natelim of neutral * clo option * value * clo
+  | Natelim of neutral * clo * value * clo
 
 and normal =
   | Reify of { typ : value; tm : value; }
@@ -59,6 +59,8 @@ end
 module Infix = Monad.Notation (M)
 
 include M
+
+(* {2 Evaluation} *)
 
 let close env (p, t) = C (p, t, env)
 
@@ -93,10 +95,9 @@ let rec eval : Raw.term -> env -> value =
      Succ (eval t env)
 
   | Raw.Natelim { discr; motive; case_zero; case_succ; } ->
-     let motive = Option.map (close env) motive in
      eval_nat_elim
        (eval discr env)
-       motive
+       (close env motive)
        (eval case_zero env)
        (close env case_succ)
 
@@ -122,36 +123,90 @@ and eval_nat_elim d m u0 uN =
 
 and eval_clo (C (p, t, env)) v = eval t (Env.extend p v env)
 
-let rec quote_ne : neutral -> unit Env.t -> Syntax.term =
+(* {2 Quotation} *)
+
+type quote_env = unit Env.t
+
+let quote_bind a env =
+  Reflect { typ = a; tm = Var env.Env.len; },
+  Env.extend Position.(unknown_pos Raw.PWildcard) () env
+
+let rec quote_ne : neutral -> quote_env -> Syntax.term =
   fun v env ->
   let t_desc =
     match v with
     | Var k ->
        Syntax.Var (env.Env.len - (k + 1))
+
     | App (ne, nf) ->
        Syntax.App (quote_ne ne env, quote_nf nf env)
-    | Natelim (discr, motive_opt, case_zero, case_succ) ->
-       let discr = quote_ne discr n in
-       let motive = assert false in
-       let case_zero = quote_nf case_zero n in
-       let case_succ = assert false in
+
+    | Natelim (discr, motive, case_zero, case_succ) ->
+       let discr = quote_ne discr env in
+       let case_zero = quote_nf (Reify { typ = eval_clo motive Zero;
+                                         tm = case_zero; }) env in
+       let case_succ =
+         quote_bound (fun x -> quote_nf (Reify { typ = eval_clo motive x;
+                                                 tm = eval_clo case_succ x; }))
+           Nat env
+       in
+       let motive =
+         quote_bound (fun x -> quote_ty (eval_clo motive x)) Nat env
+       in
        Syntax.Natelim { discr; motive; case_zero; case_succ; }
+  in
+  Syntax.{ t_desc; t_loc = Position.dummy; }
+
+and quote_nf : normal -> unit Env.t -> Syntax.term =
+  fun (Reify { typ; tm; }) env ->
+  let mk t_desc = Syntax.{ t_desc; t_loc = Position.dummy; } in
+  match typ, tm with
+  | _, Reflect { tm; _ } ->
+     quote_ne tm env
+
+  | Type, _ ->
+     quote_ty tm env
+
+  | Forall (a, f), _ ->
+     let quote_body x =
+       quote_nf (Reify { typ = eval_clo f x; tm = eval_app tm x; })
+     in
+     mk (Syntax.Lam (quote_bound quote_body a env))
+
+  | Nat, Zero ->
+     Syntax.Build.zero
+
+  | Nat, Succ tm ->
+     Syntax.Build.succ (quote_nf (Reify { typ; tm; }) env)
+
+  | _, Lam _ ->
+     assert false             (* eliminated by η-expansion  *)
+
+  | _ ->
+     assert false             (* ill-typed *)
+
+and quote_ty : value -> unit Env.t -> Syntax.term =
+  fun v env ->
+  let t_desc =
+    match v with
+    | Type ->
+       Syntax.Type
+
+    | Nat ->
+       Syntax.Nat
+
+    | Forall (a, f) ->
+       Syntax.Forall (quote_ty a env,
+                      quote_bound (fun x -> quote_ty (eval_clo f x)) a env)
+
+    | Reflect _ | Zero | Succ _ | Lam _ ->
+       invalid_arg "quote_ty"
   in
   { t_desc; t_loc = Position.dummy; }
 
-and quote_nf : normal -> int -> Syntax.term =
-  fun (Reify { typ; tm; }) n ->
-  match tm with
-  | Lam _ ->
-     assert false
-  | Type ->
-     Syntax.Type
-  | Nat ->
-     Syntax.Nat
-  | Zero ->
-     Syntax.Zero
-  | Succ tm ->
-     Syntax.Succ (quote_nf (Reify { typ; tm; }) n)
+and quote_bound f a env =
+  let x, env = quote_bind a env in
+  Syntax.Bound1 { body = f x env; user = None; }
 
 let check : Raw.t -> Syntax.t t =
   fun _r -> return []
