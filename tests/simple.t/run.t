@@ -1,3 +1,4 @@
+  $ melitte t1.melitte
   $ melitte simple.melitte
   {- Raw source code -}
   val x : 𝕌 = ℕ
