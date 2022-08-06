@@ -1,224 +1,450 @@
 module R = Raw
 module S = Syntax
 
-module Env = struct
-  type 'a t = { len : int; names : (R.pattern_desc * 'a) list; }
-
-  let empty = { len = 0; names = []; }
-
-  let lookup pos x env =
-    let rec loop env =
-      match env with
-      | [] -> Error.unbound_identifier pos x
-      | (R.PWildcard, _) :: env -> loop env
-      | (R.PVar y, v) :: env -> if x = y then v else loop env
-    in
-    loop env.names
-
-  let extend p v env =
-    { len = env.len + 1; names = (p, v) :: env.names; }
-
-  let map f env =
-    { env with names = List.map (function (p, v) -> (p, f v)) env.names; }
-end
+module Env = DeBruijn.Env
 
 type value =
   | Reflect of { ty : value; tm : neutral; }
-  | Lam of clo
-  | Forall of value * clo
+  | Lam of clo1
+  | Forall of value * clo1
   | Type
   | Nat
   | Zero
   | Succ of value
 
 and neutral =
-  | Var of int
+  | Var of DeBruijn.Lv.t
   | App of neutral * normal
-  | Natelim of neutral * clo * value * clo
+  | Natelim of neutral * clo1 * value * clo2
 
 and normal =
   | Reify of { ty : value; tm : value; }
 
-and clo = C of R.pattern * R.term * value Env.t
+and clo1 = C1 of env * S.bound1
 
-and env = value Env.t
+and clo2 = C2 of env * S.bound2
 
-module M = struct
-  type 'a t = env -> 'a * env
+(** Names are not used for evaluation since we only evaluate core syntax. Hence,
+    environments are accessed via De Bruijn indices. *)
+and env = entry Env.t
 
-  let return x = fun env -> x, env
+and entry = {
+    v : value;                  (** Used for evaluation. *)
+    ty : ty option;             (** Used only during type checking, in which
+                                    case this field is never [None]. *)
+    n : Name.t;                 (** Used only for scoping. *)
+  }
 
-  let bind (type a b) (x : a t) (f : a -> b t) : b t =
-    fun env -> let y, env = x env in f y env
+and ty = value
 
-  let run x = let y, _ = x Env.empty in y
-end
+(* {2 Utilities} *)
 
-module Infix = Monad.Notation (M)
+let clo1_name (C1 (_, S.Bound1 { user; _ })) =
+  Option.value ~default:Name.dummy user
 
-include M
+let fresh ty free =
+  Reflect { ty; tm = Var DeBruijn.Lv.(fresh ~free); }
+
+let find loc x env =
+  try Env.find (fun en -> en.n = x) env
+  with Not_found -> Error.unbound_identifier loc x
+
+let extend ?ty ?user v env =
+  Env.extend { v; ty; n = Option.value ~default:Name.dummy user; } env
+
+let extend_pat ?ty pat v env =
+  Env.extend { v; ty; n = R.name_of_pattern pat; } env
+
+let extend_typed ?v ?user ty env =
+  let v = match v with
+    | None ->
+       Reflect { ty; tm = Var DeBruijn.Lv.(fresh ~free:(Env.width env)); }
+    | Some v ->
+       v
+  in
+  extend ~ty ?user v env
+
+let extend_typed_pat ?v pat ty env =
+  extend_typed ?v ~user:(R.name_of_pattern pat) ty env
 
 (* {2 Evaluation} *)
 
-let close env (p, t) = C (p, t, env)
+let close1 b1 env = C1 (env, b1)
 
-let rec eval : R.term -> env -> value =
+let close2 b2 env = C2 (env, b2)
+
+let rec eval : S.term -> env -> value =
   fun t env ->
-  match t.Position.value with
-  | R.Var x ->
-     Env.lookup t.Position.position x env
+  match t.t_desc with
+  | S.Var ix ->
+     begin try (Env.lookup env ix).v
+           with Not_found -> Error.internal "ill-scoped evaluation" end
 
-  | R.Lam t ->
-     Lam (close env t)
+  | S.Lam tm ->
+     Lam (close1 tm env)
 
-  | R.App (t, u) ->
+  | S.App (t, u) ->
      eval_app (eval t env) (eval u env)
 
-  | R.Forall (a, b) ->
-     Forall (eval a env, close env b)
+  | S.Forall (a, b) ->
+     Forall (eval a env, close1 b env)
 
-  | R.Let { bound; body; _ } ->
-     eval_clo (close env body) (eval bound env)
+  | S.Let { def; body; _ } ->
+     eval_clo1 (close1 body env) (eval def env)
 
-  | R.Type ->
+  | S.Type ->
      Type
 
-  | R.Nat ->
+  | S.Nat ->
      Nat
 
-  | R.Zero ->
+  | S.Zero ->
      Zero
 
-  | R.Succ t ->
+  | S.Succ t ->
      Succ (eval t env)
 
-  | R.Natelim { discr; motive; case_zero; case_succ; } ->
+  | S.Natelim { scrut; motive; case_zero; case_succ; } ->
      eval_nat_elim
-       (eval discr env)
-       (close env motive)
+       (eval scrut env)
+       (close1 motive env)
        (eval case_zero env)
-       (close env case_succ)
+       (close2 case_succ env)
 
 and eval_app v w =
   match v with
   | Lam c ->
-     eval_clo c w
+     eval_clo1 c w
   | Reflect { ty = Forall (a, b); tm; } ->
-     Reflect { ty = eval_clo b w; tm = App (tm, Reify { ty = a; tm = w; }); }
+     Reflect { ty = eval_clo1 b w; tm = App (tm, Reify { ty = a; tm = w; }); }
   | _ ->
-     assert false               (* type error *)
+     Error.internal "ill-typed evaluation"
 
 and eval_nat_elim d m u0 uN =
   match d with
   | Zero ->
      u0
   | Succ n ->
-     eval_clo uN n
+     let vp = eval_nat_elim n m u0 uN in
+     eval_clo2 uN n vp
   | Reflect { ty = Nat; tm; } ->
      Reflect { ty = Nat; tm = Natelim (tm, m, u0, uN); }
   | _ ->
-     assert false               (* type error *)
+     Error.internal "ill-typed evaluation"
 
-and eval_clo (C (p, t, env)) v = eval t (Env.extend p.value v env)
+and eval_clo1 (C1 (env, Bound1 { body; user; })) v =
+  eval body (extend ?user v env)
+
+and eval_clo2 (C2 (env, Bound2 { body; user1; user2; })) v1 v2 =
+  eval body (extend ?user:user2 v2 (extend ?user:user1 v1 env))
 
 (* {2 Quotation} *)
 
-let fresh ty n = Reflect { ty; tm = Var n; }, n + 1
+module Quote = struct
+  module M = Monad.Reader(struct type t = int end)
+  open Monad.Notation(M)
 
-let rec quote_ne : neutral -> int -> S.term =
-  fun v n ->
-  let t_desc =
-    match v with
-    | Var k ->
-       S.Var (n - (k + 1))
+  let fresh ?n ty =
+    let* v = fresh ty in
+    return { n = Option.value ~default:Name.dummy n; v; ty = Some ty; }
+
+  let (let$) : entry M.t -> (value -> 'a M.t) -> 'a M.t =
+    fun x k free -> let en = x free in k en.v (free + 1)
+
+  let rec neutral = function
+    | Var lv ->
+       let* free = M.get in
+       return (S.Build.var (DeBruijn.ix_of_lv ~free lv))
 
     | App (ne, nf) ->
-       S.App (quote_ne ne n, quote_nf nf n)
+       let* ne = neutral ne in
+       let* nf = normal nf in
+       return @@ S.Build.app ne nf
 
-    | Natelim (discr, motive, case_zero, case_succ) ->
-       let discr = quote_ne discr n in
-       let case_zero = quote_nf (Reify { ty = eval_clo motive Zero;
-                                         tm = case_zero; }) n in
-       let case_succ = quote_clo_nf ~bound_ty:Nat ~ty:motive case_succ n in
-       let motive = quote_clo_ty ~bound_ty:Nat motive n in
-       S.Natelim { discr; motive; case_zero; case_succ; }
-  in
-  S.{ t_desc; t_loc = Position.dummy; }
+    | Natelim (scrut, motive, case_zero, case_succ) ->
+       let n = clo1_name motive in
+       let* scrut = neutral scrut in
+       let* case_zero = normal_ ~ty:(eval_clo1 motive Zero) ~tm:case_zero in
+       let$ x1 = fresh ~n Nat in
+       let* case_succ =
+         let$ x2 = fresh ~n (eval_clo1 motive x1) in
+         normal_clo2 ~ty:(eval_clo1 motive (Succ x1)) case_succ x1 x2
+       in
+       let* motive = typ_clo1 motive x1 in
+       return @@ S.Build.natelim ~scrut ~motive ~case_zero ~case_succ ()
 
-and quote_nf : normal -> int -> S.term =
-  fun (Reify { ty; tm; }) n ->
-  match ty, tm with
-  | _, Reflect { tm; _ } ->
-     quote_ne tm n
+  and normal_ ~ty ~tm =
+    match ty, tm with
+    | _, Reflect { tm; _ } ->
+       neutral tm
 
-  | Type, _ ->
-     quote_ty tm n
+    | Type, _ ->
+       typ tm
 
-  | Forall (a, f), v ->
-     let x, n = fresh a n in
-     S.Build.lam
-       (Bound1 { body = quote_nf (Reify { ty = eval_clo f x;
-                                          tm = eval_app v x; }) n;
-                 user = None; })
+    | Forall (a, f), v ->
+       let n = clo1_name f in
+       let$ x = fresh ~n a in
+       let* body = normal_ ~ty:(eval_clo1 f x) ~tm:(eval_app v x) in
+       return @@ S.Build.lam (Bound1 { body; user = None; })
 
-  | Nat, Zero ->
-     S.Build.zero
+    | Nat, Zero ->
+       return @@ S.Build.zero ()
 
-  | Nat, Succ tm ->
-     S.Build.succ (quote_nf (Reify { ty; tm; }) n)
+    | Nat, Succ tm ->
+       let* tm = normal_ ~ty ~tm in
+       return @@ S.Build.succ tm
 
-  | _, Lam _ ->
-     assert false             (* eliminated by η-expansion  *)
+    | _, Lam _ ->
+       Error.internal "eta-expansion failure"
 
-  | _ ->
-     assert false             (* ill-typed *)
+    | _ ->
+       Error.internal "ill-typed quotation"
 
-and quote_ty : value -> int -> S.term =
-  fun v n ->
-  let t_desc =
-    match v with
+  and normal (Reify { ty; tm; }) =
+    normal_ ~ty ~tm
+
+  and typ = function
     | Type ->
-       S.Type
+       return @@ S.Build.typ ()
 
     | Nat ->
-       S.Nat
+       return @@ S.Build.nat ()
 
     | Forall (a, f) ->
-       S.Forall (quote_ty a n, quote_clo_ty f ~bound_ty:a n)
+       let n = clo1_name f in
+       let* f =
+         let$ x_a = fresh ~n a in
+         typ_clo1 f x_a
+       in
+       let* a = typ a in
+       return @@ S.Build.forall a f
 
     | Reflect _ | Zero | Succ _ | Lam _ ->
-       invalid_arg "quote_ty"
-  in
-  { t_desc; t_loc = Position.dummy; }
+       Error.internal "ill-typed quotation"
 
-and quote_clo_ty ~bound_ty clo n =
-  let x, n = fresh bound_ty n in
-  S.Bound1 { body = quote_ty (eval_clo clo x) n; user = None; }
+  and typ_clo1 (C1 (_, Bound1 { user; _ }) as clo) x =
+    let* body = typ (eval_clo1 clo x) in
+    return @@ S.Bound1 { body; user; }
 
-and quote_clo_nf ~bound_ty ~ty clo env =
-  let x, n = fresh bound_ty env in
-  S.Bound1 { body = quote_nf (Reify { ty = eval_clo ty x;
-                                      tm = eval_clo clo x; }) n;
-                  user = None; }
+  and normal_clo2 ~ty (C2 (_, Bound2 { user1; user2; _ }) as clo) x1 x2 =
+    let* body = normal_ ~ty ~tm:(eval_clo2 clo x1 x2) in
+    return @@ S.Bound2 { body; user1; user2; }
+end
 
 (* {2 Normalization} *)
 
-let reflect_cx : R.ty Env.t -> value Env.t =
-  fun Env.{ len; names; } ->
-  let rec loop len names =
-    match names with
-    | [] -> Env.empty
-    | (p, a) :: names ->
-       let env = loop (len - 1) names in
-       Env.extend p (Reflect { ty = eval a env; tm = Var len; }) env
-  in
-  loop len names
-
-let nf ~env ~ty t =
-  let env = reflect_cx env in
-  quote_nf (Reify { ty = eval ty env; tm = eval t env; }) env.len
+let nf ~env ~ty ~tm =
+  let open Quote in
+  M.run (Env.width env) (normal_ ~ty:(eval ty env) ~tm:(eval tm env))
 
 (* {2 Type checking} *)
 
-let check : R.t -> S.t t =
-  fun _r -> return []
+module M = struct
+  include Monad.Reader(struct type t = env end)
+  let run x = x Env.empty
+end
+open Monad.Notation(M)
+
+(*   let (let$) : ty * value option -> *)
+
+(* let (let$) : S.ty -> (value -> 'a M.t) -> 'a M.t = *)
+(*   fun ty k free -> *)
+(*   k (Reflect { ty; tm = Var (DeBruijn.Lv.last ~free); }) (free + 1) *)
+
+let (let$) : entry M.t -> (value -> 'a M.t) -> 'a M.t =
+  fun x k env -> let en = x env in k en.v (Env.extend en env)
+
+let lift : 'a Quote.M.t -> 'a M.t = fun c env -> c (Env.width env)
+
+let fresh ?n ?v ty =
+  let* v =
+    lift @@ match v with
+            | None -> fresh ty
+            | Some v -> Quote.M.return v
+  in
+  return { n = Option.value ~default:Name.dummy n; v; ty = Some ty; }
+
+let check_conv ~expected ~actual loc =
+  let* expected = lift @@ Quote.typ expected in
+  let* actual = lift @@ Quote.typ actual in
+  if not (Syntax.equal_term expected actual)
+  then Error.unexpected_type ~expected ~actual loc;
+  return ()
+
+let rec check : expected:ty -> R.term -> S.term M.t =
+  fun ~expected (Position.{ value = r; position = loc; } as tm) ->
+  match r with
+  | Let { def; ty; body; } ->
+     let* ty = check_is_ty ty in
+     let* tysem = eval ty in
+     let* def = check ~expected:tysem def in
+     let* defsem = eval def in
+     let* body =
+       let$ _ = fresh ~v:defsem tysem in
+       check_bound1 ~expected body
+     in
+     return @@ S.Build.let_ ~loc ~def ~ty ~body ()
+
+  | Forall _ ->
+     assert false               (* TODO *)
+
+  | Lam body ->
+     begin match expected with
+     | Forall (a, f) ->
+        let$ x = fresh a in
+        let* body = check_bound1 ~expected:(eval_clo1 f x) body in
+        return @@ S.Build.lam ~loc body
+
+     | actual ->
+        let* actual = lift @@ Quote.typ actual in
+        Error.unexpected_head_constr ~expected:`Forall ~actual loc
+     end
+
+  | Nat ->
+     begin match expected with
+     | Type ->
+        return @@ S.Build.nat ~loc ()
+
+     | actual ->
+        let* actual = lift @@ Quote.typ actual in
+        Error.unexpected_head_constr ~expected:`Univ ~actual loc
+     end
+
+  | Type ->
+     begin match expected with
+     | Type ->
+        if !Options.type_in_type
+        then return @@ S.Build.typ ~loc ()
+        else Error.universe_inconsistency loc
+
+     | actual ->
+        let* actual = lift @@ Quote.typ actual in
+        Error.unexpected_head_constr ~expected:`Univ ~actual loc
+     end
+
+  | Var _ | App _ | Zero | Succ _ | Natelim _ ->
+     let* tm, actual = infer tm in
+     let* () = check_conv ~expected ~actual loc in
+     return tm
+
+and check_is_ty : R.ty -> S.ty M.t =
+  fun (Position.{ value = tm; position = loc; } as r) ->
+  match tm with
+  | Forall (a, f) ->
+     let* a = check_is_ty a in
+     let* f =
+       let* asem = eval a in
+       let$ _ = fresh asem in
+       check_bound1_is_ty f
+     in
+     return @@ S.Build.forall ~loc a f
+
+  | Nat ->
+     return @@ S.Build.nat ~loc ()
+
+  | Type ->
+     return @@ S.Build.typ ~loc ()
+
+  | Lam _ ->
+     check ~expected:Type r
+
+  | Let _ ->
+     assert false               (* TODO *)
+
+  | Var _ | App _ | Natelim _ | Zero | Succ _ ->
+     let* tm, ty = infer r in
+     begin match ty with
+     | Type ->
+        return tm
+     | actual ->
+        let* actual = lift @@ Quote.typ actual in
+        Error.unexpected_head_constr ~expected:`Univ ~actual loc
+     end
+
+and infer : R.term -> (S.term * ty) M.t =
+  fun Position.{ value = r; position = loc; } ->
+  match r with
+  | Var x ->
+     let* ix, { ty; _ } = find loc x in
+     return @@ (S.Build.var ix, Option.get ty)
+
+  | App (m, n) ->
+     let* m, mty = infer m in
+     begin match mty with
+     | Forall (a, f) ->
+        let* n = check ~expected:a n in
+        let* msem = eval m in
+        return @@ (S.Build.app m n, eval_clo1 f msem)
+
+     | actual ->
+        let* actual = lift @@ Quote.typ actual in
+        Error.unexpected_head_constr loc ~expected:`Forall ~actual
+     end
+
+  | R.Zero ->
+     return @@ (S.Build.zero ~loc (), Nat)
+
+  | R.Succ m ->
+     let* m = check ~expected:Nat m in
+     return @@ (S.Build.succ ~loc m, Nat)
+
+  | Natelim { scrut; motive; case_zero; case_succ; } ->
+     let* scrut = check ~expected:Nat scrut in
+     let* motive =
+       let$ _ = fresh Nat in
+       check_bound1_is_ty motive
+     in
+     let* motsem = close1 motive in
+     let* case_zero = check ~expected:(eval_clo1 motsem Zero) case_zero in
+     let* case_succ =
+       let$ x1 = fresh Nat in
+       let$ _ = fresh (eval_clo1 motsem x1) in
+       check_bound2 ~expected:(eval_clo1 motsem (Succ x1)) case_succ
+     in
+     let* resty =
+       let* scrutsem = eval scrut in
+       return @@ eval_clo1 motsem scrutsem
+     in
+     return @@ (S.Build.natelim ~scrut ~motive ~case_zero ~case_succ (), resty)
+
+  | Let _ | Forall _ | Lam _ | Nat | Type ->
+     Error.could_not_synthesize loc
+
+and check_bound1_is_ty : R.bound1 -> S.bound1 M.t =
+  fun (R.Bound1 { pat; body; }) ->
+  let* body = check_is_ty body in
+  return @@ S.Bound1 { user = Raw.name_option_of_pattern pat; body; }
+
+and check_bound1 : expected:ty -> R.bound1 -> S.bound1 M.t =
+  fun ~expected (R.Bound1 { pat; body; }) ->
+  let* body = check ~expected body in
+  return @@ S.Bound1 { user = Raw.name_option_of_pattern pat; body; }
+
+and check_bound2 : expected:ty -> R.bound2 -> S.bound2 M.t =
+  fun ~expected (R.Bound2 { pat1; pat2; body; }) ->
+  let* body = check ~expected body in
+  return @@ S.Bound2 { user1 = Raw.name_option_of_pattern pat1;
+                       user2 = Raw.name_option_of_pattern pat2;
+                       body; }
+
+let phrase : R.phrase -> (S.phrase * env) M.t =
+  fun Position.{ value; position = loc; } ->
+  match value with
+  | Val { name; ty; body; } ->
+     let* ty = check_is_ty ty in
+     let* tysem = eval ty in
+     let* body = check ~expected:tysem body in
+     let* env =
+       let* bodysem = eval body in
+       let$ _ = fresh ~n:name ~v:bodysem tysem in
+       M.get
+     in
+     return @@ (S.Build.val_ ~loc ~user:name ~ty ~body (), env)
+
+let rec check = function
+  | [] ->
+     return []
+  | ph :: file ->
+     let* ph, env = phrase ph in
+     let file = check file env in
+     return @@ ph :: file

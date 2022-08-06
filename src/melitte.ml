@@ -17,7 +17,7 @@ let process inp =
     let raw = parse inp in
     Printf.printf "{- Raw source code -}\n";
     ExtPrint.to_out (Raw.PPrint.file raw);
-    let syn = Elaborator.(run @@ check raw) in
+    let syn = Elaborator.(M.run @@ check raw) in
     print_newline ();
     Printf.printf "{- Elaborated source code -}\n";
     ExtPrint.to_out (Syntax.PPrint.file syn)
@@ -38,6 +38,8 @@ let () =
                                        |> Option.get
                                        |> UnicodeSigil.set_encoding),
          " set output encoding";
+         "-type-in-type", Set Options.type_in_type,
+         " accept type-in-type (inconsistent)";
        ]
     )
     (fun s -> inputs := `File s :: !inputs)

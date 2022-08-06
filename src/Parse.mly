@@ -9,7 +9,7 @@
 %token LAM FORALL LET IN TYPE NAT ZERO SUCC ELIM WITH VAL
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR
-%token UNDERSCORE COLON BAR
+%token UNDERSCORE COLON BAR COMMA
 %token EOF
 
 %nonassoc IN DARR
@@ -50,28 +50,31 @@ weakened_term(X):
 | b = hyp X te = term { (b, te) }
 
 motive:
-| WITH p = pattern DARR ty = ty { (p, ty) }
+| WITH p = pattern DARR ty = ty { Build.bound1 p ty }
 
 term_:
 | t = simple_term_ { t }
 | LAM ids = pattern+ DARR t = term { v @@ Build.lambda ids t }
-| LET p = pattern COLON ty = ty EQ bound = term IN body = term
-  { Let { bound; ty; body = (p, body); } }
+| LET p = pattern COLON ty = ty EQ def = term IN body = term
+  { Let { def; ty; body = Build.bound1 p body; } }
 | FORALL hyps = parens(hyp)+ ARR b = ty { v @@ Build.forall hyps b }
 | a = term ARR b = term { v @@ Build.arrow a b }
-| ELIM discr = term motive = motive
+| ELIM scrut = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term
-  BAR SUCC case_succ = binding(DARR)
-  RBRACE { Natelim { discr; motive; case_zero; case_succ; } }
+  BAR SUCC case_succ = bind2(DARR)
+  RBRACE { Natelim { scrut; motive; case_zero; case_succ; } }
 
 %inline term:
 | located(term_) { $1 }
 
 %inline ty: term { $1 }
 
-binding(SEP):
-| x = pattern SEP t = term { (x, t) }
+bind1(SEP):
+| p = pattern SEP t = term { Build.bound1 p t }
+
+bind2(SEP):
+| p1 = pattern COMMA p2 = pattern SEP t = term { Build.bound2 p1 p2 t }
 
 pattern_:
 | UNDERSCORE { PWildcard }
@@ -84,7 +87,7 @@ hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
 phrase_desc:
-| VAL id = name COLON ty = ty EQ t = term { Val (id, ty, t) }
+| VAL name = name COLON ty = ty EQ body = term { Val { name; ty; body; } }
 
 %inline phrase:
 | p = located(phrase_desc) { p }

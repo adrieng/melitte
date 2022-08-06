@@ -1,76 +1,69 @@
 open Sexplib.Std
 
-type idx = int [@@deriving sexp_of]
-
 type term_desc =
-  | Var of idx
+  | Var of DeBruijn.Ix.t
+  | Let of { def : term; ty : term; body : bound1; }
+  | Forall of term * bound1
   | Lam of bound1
   | App of term * term
-  | Forall of term * bound1
-  | Let of term * term * bound1
-  | Type
   | Nat
   | Zero
   | Succ of term
-  | Natelim of { discr : term;
+  | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound1; }
+                 case_succ : bound2; }
+  | Type
 
 and term =
   {
     t_desc : term_desc;
-    t_loc : Position.t;
+    t_loc : Position.t; [@equal fun _ _ -> true]
   }
 
 and bound1 =
   Bound1 of {
       body : term;
-      user : Raw.name option;
+      user : Name.t option; [@equal fun _ _ -> true]
+    }
+
+and bound2 =
+  Bound2 of {
+      body : term;
+      user1 : Name.t option; [@equal fun _ _ -> true]
+      user2 : Name.t option; [@equal fun _ _ -> true]
     }
 
 and phrase_desc =
-  | Val of Raw.name * term * term
+  | Val of { user : Name.t option; ty : term; body : term; }
 
 and phrase =
   {
     ph_desc : phrase_desc;
-    ph_loc : Position.t;
+    ph_loc : Position.t; [@equal fun _ _ -> true]
   }
 
-and t = phrase list [@@deriving sexp_of]
+and t = phrase list [@@deriving sexp_of, eq]
 
 type ty = term
 
-module Env = struct
-  type t = E of Raw.name list * int
-
-  let initial = E ([], 0)
-
-  let lookup : t -> int -> Raw.name =
-    fun (E (names, _)) i ->
-    try List.nth names i
-    with Not_found -> "_x" ^ string_of_int @@ (i - List.length names)
-
-  let extend : t -> Raw.name option -> Raw.name * t =
-    fun (E (names, cpt)) u ->
-    let name, cpt =
-      match u with
-      | Some name -> name, cpt
-      | None -> "_y" ^ string_of_int cpt, cpt + 1
-    in
-    name, E (name :: names, cpt)
-end
+let extend env p =
+  let name =
+    match p with
+    | Some name -> name
+    | None -> "_x" ^ string_of_int (DeBruijn.Env.width env)
+  in
+  name, DeBruijn.Env.extend name env
 
 let rec raw_of_desc env = function
-  | Var i ->
-     Raw.Var (Env.lookup env i)
+  | Var ix ->
+     Raw.Var (DeBruijn.Env.lookup env ix)
   | Lam b ->
-     Raw.Lam (weakened_of_bound1 env b)
+     Raw.Lam (bound1 env b)
   | App (t, u) ->
      Raw.App (raw_of env t, raw_of env u)
   | Forall (t, u) ->
-     Raw.Forall (raw_of env t, weakened_of_bound1 env u)
+     Raw.Forall (raw_of env t, bound1 env u)
   | Let _ ->
      assert false               (* TODO *)
   | Type ->
@@ -81,23 +74,32 @@ let rec raw_of_desc env = function
      Raw.Zero
   | Succ t ->
      Raw.Succ (raw_of env t)
-  | Natelim { discr; motive; case_zero; case_succ; } ->
-     Raw.Natelim { discr = raw_of env discr;
-                   motive = weakened_of_bound1 env motive;
+  | Natelim { scrut; motive; case_zero; case_succ; } ->
+     Raw.Natelim { scrut = raw_of env scrut;
+                   motive = bound1 env motive;
                    case_zero = raw_of env case_zero;
-                   case_succ = weakened_of_bound1 env case_succ; }
+                   case_succ = bound2 env case_succ; }
 
 and raw_of env { t_desc; t_loc; } =
   Position.{ value = raw_of_desc env t_desc; position = t_loc; }
 
-and weakened_of_bound1 env (Bound1 { body; user; }) =
-  let name, env = Env.extend env user in
-  Raw.Build.pvar name, raw_of env body
+and bound1 env (Bound1 { body; user; }) =
+  let name, env = extend env user in
+  Raw.Bound1 { pat = Raw.Build.pvar name; body = raw_of env body; }
+
+and bound2 env (Bound2 { body; user1; user2; }) =
+  let name1, env = extend env user1 in
+  let name2, env = extend env user2 in
+  Raw.Bound2 { pat1 = Raw.Build.pvar name1;
+               pat2 = Raw.Build.pvar name2;
+               body = raw_of env body; }
 
 let rec raw_of_phrase_desc env = function
-  | Val (name, ty, body) ->
-     let _, new_env = Env.extend env (Some name) in
-     new_env, Raw.Val (name, raw_of env ty, raw_of new_env body)
+  | Val { user; ty; body; } ->
+     let ty = raw_of env ty in
+     let body = raw_of env body in
+     let name, new_env = extend env user in
+     new_env, Raw.Val { name; ty; body; }
 
 and raw_of_phrase env { ph_desc; ph_loc; } =
   let env, ph_desc = raw_of_phrase_desc env ph_desc in
@@ -106,22 +108,43 @@ and raw_of_phrase env { ph_desc; ph_loc; } =
 let raw_of_file env phs = List.fold_left_map raw_of_phrase env phs
 
 module Build = struct
-  let lam bound = { t_desc = Lam bound; t_loc = Position.dummy; }
+  let desc ?loc t_desc =
+    { t_desc; t_loc = Option.value ~default:Position.dummy loc; }
 
-  let zero = { t_desc = Zero; t_loc = Position.dummy; }
+  let var ?loc ix = desc ?loc @@ Var ix
 
-  let succ t = { t_desc = Succ t; t_loc = Position.dummy; }
+  let let_ ?loc ~def ~ty ~body () = desc ?loc @@ Let { def; ty; body; }
+
+  let forall ?loc a f = desc ?loc @@ Forall (a, f)
+
+  let lam ?loc bound = desc ?loc @@ Lam bound
+
+  let app ?loc t u = desc ?loc @@ App (t, u)
+
+  let nat ?loc () = desc ?loc Nat
+
+  let zero ?loc () = desc ?loc Zero
+
+  let succ ?loc t = desc ?loc @@ Succ t
+
+  let natelim ?loc ~scrut ~motive ~case_zero ~case_succ () =
+    desc ?loc @@ Natelim { scrut; motive; case_zero; case_succ; }
+
+  let typ ?loc () = desc ?loc Type
+
+  let val_ ?(loc = Position.dummy) ?user ~ty ~body () =
+    { ph_loc = loc; ph_desc = Val { user; ty; body; } }
 end
 
 module PPrint = struct
   let term te =
-    Raw.PPrint.term (raw_of Env.initial te)
+    Raw.PPrint.term (raw_of DeBruijn.Env.empty te)
 
   let phrase ph =
-    let _, raw = raw_of_phrase Env.initial ph in
+    let _, raw = raw_of_phrase DeBruijn.Env.empty ph in
     Raw.PPrint.phrase raw
 
   let file phs =
-    let _, raw = raw_of_file Env.initial phs in
+    let _, raw = raw_of_file DeBruijn.Env.empty phs in
     Raw.PPrint.file raw
 end

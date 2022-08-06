@@ -1,25 +1,21 @@
-(** {1 Syntax} *)
+(** {1 Core Syntax} *)
 
 (** This module defines well-typed syntax, as produced by the elaborator. *)
 
-(** At this level, names are De Bruijn indices. *)
-
-type idx = int
-
 type term_desc =
-  | Var of idx
+  | Var of DeBruijn.Ix.t
+  | Let of { def : term; ty : term; body : bound1; }
+  | Forall of term * bound1
   | Lam of bound1
   | App of term * term
-  | Forall of term * bound1
-  | Let of term * term * bound1
-  | Type
   | Nat
   | Zero
   | Succ of term
-  | Natelim of { discr : term;
+  | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound1; }
+                 case_succ : bound2; }
+  | Type
 
 and term =
   {
@@ -30,11 +26,18 @@ and term =
 and bound1 =
   Bound1 of {
       body : term;              (* term under binder *)
-      user : Raw.name option;   (* for pretty-printing *)
+      user : Name.t option;     (* for pretty-printing only *)
+    }
+
+and bound2 =
+  Bound2 of {
+      body : term;              (* term under binder *)
+      user1 : Name.t option;    (* for pretty-printing only *)
+      user2 : Name.t option;    (* for pretty-printing only *)
     }
 
 and phrase_desc =
-  | Val of Raw.name * term * term
+  | Val of { user : Name.t option; ty : term; body : term; }
 
 and phrase =
   {
@@ -48,10 +51,35 @@ type ty = term
 
 val sexp_of_t : t -> Sexplib.Sexp.t
 
+val equal_term : term -> term -> bool
+
 module Build : sig
-  val lam : bound1 -> term
-  val zero : term
-  val succ : term -> term
+  val var : ?loc:Position.t -> DeBruijn.Ix.t -> term
+  val let_ : ?loc:Position.t ->
+             def:term ->
+             ty:term ->
+             body:bound1 ->
+             unit ->
+             term
+  val forall : ?loc:Position.t -> term -> bound1 -> term
+  val lam : ?loc:Position.t -> bound1 -> term
+  val app : ?loc:Position.t -> term -> term -> term
+  val nat : ?loc:Position.t -> unit -> term
+  val zero : ?loc:Position.t -> unit -> term
+  val succ : ?loc:Position.t -> term -> term
+  val natelim : ?loc:Position.t ->
+                scrut:term ->
+                motive:bound1 ->
+                case_zero:term ->
+                case_succ:bound2 ->
+                unit -> term
+  val typ : ?loc:Position.t -> unit -> term
+  val val_ : ?loc:Position.t ->
+             ?user:Name.t ->
+             ty:ty ->
+             body:term ->
+             unit ->
+             phrase
 end
 
 module PPrint : sig

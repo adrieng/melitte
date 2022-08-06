@@ -68,6 +68,7 @@ let rec token lexbuf = match%sedlex lexbuf with
   | "_" -> UNDERSCORE
   | ":" -> COLON
   | "|" -> BAR
+  | "," -> COMMA
   | '\\' | 955 -> LAM
 
   | atom -> keyword_or_ident (utf8_string_of_lexbuf lexbuf)

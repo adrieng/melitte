@@ -27,6 +27,11 @@ module type PrintableType = sig
   val pp : t -> PPrint.document
 end
 
+module type PrintableComparableType = sig
+  include PrintableType
+  val equal : t -> t -> bool
+end
+
 module Formatter = struct
   type 'a t = Format.formatter -> 'a -> unit
 end

@@ -9,3 +9,5 @@ let to_string d =
   let b = Buffer.create 100 in
   PPrint.ToBuffer.pretty ribbon width b d;
   Buffer.contents b
+
+let to_fmt pp fmt x = PPrint.ToFormatter.pretty ribbon width fmt (pp x)
