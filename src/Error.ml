@@ -4,11 +4,11 @@ type error =
   | Unbound_identifier of Position.t * string
   | Could_not_synthesize of Position.t
   | Unexpected_type of { loc : Position.t;
-                         expected : Core.ty;
-                         actual : Core.ty; }
+                         expected : Raw.ty;
+                         actual : Raw.ty; }
   | Unexpected_head_constr of { loc : Position.t;
                                 expected : [`Forall | `Univ];
-                                actual : Core.ty; }
+                                actual : Raw.ty; }
   | Universe_inconsistency of Position.t
 
 let print fmt = function
@@ -28,8 +28,8 @@ let print fmt = function
      Format.fprintf fmt
        "%s: this expression has type @[%a@] but type @[%a@] was expected"
        (Position.to_string loc)
-       (ExtPrint.to_fmt Core.PPrint.term) actual
-       (ExtPrint.to_fmt Core.PPrint.term) expected
+       (ExtPrint.to_fmt Raw.PPrint.term) actual
+       (ExtPrint.to_fmt Raw.PPrint.term) expected
   | Unexpected_head_constr { loc; expected; actual; } ->
      let open UnicodeSigil in
      let head_constr = function
@@ -40,7 +40,7 @@ let print fmt = function
        "%s: this expression has type @[%a@] but a type of shape @[%a]\
 was expected"
        (Position.to_string loc)
-       (ExtPrint.to_fmt Core.PPrint.term) actual
+       (ExtPrint.to_fmt Raw.PPrint.term) actual
        (ExtPrint.to_fmt head_constr) expected
   | Universe_inconsistency loc ->
      Format.fprintf fmt "%s: universe inconsistency"

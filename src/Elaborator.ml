@@ -198,12 +198,16 @@ module Quote = struct
        Error.internal "eta-expansion failure"
 
     | _ ->
-       Error.internal "ill-typed quotation"
+       Error.internal "ill-typed normal quotation"
 
   and normal (Reify { ty; tm; }) =
     normal_ ~ty ~tm
 
-  and typ = function
+  and typ =
+    fun t ->
+    if !Options.verbose
+    then Format.eprintf "quote %a@." Sexplib.Sexp.pp_hum (sexp_of_value t);
+    match t with
     | Type ->
        return @@ C.Build.typ ()
 
@@ -223,7 +227,7 @@ module Quote = struct
        neutral tm
 
     | Zero | Suc _ | Lam _ ->
-       Error.internal "ill-typed quotation"
+       Error.internal "ill-typed type quotation"
 
   and typ_clo1 (C1 (_, Bound1 { user; _ }) as clo) x =
     let* body = typ (eval_clo1 clo x) in
@@ -251,21 +255,39 @@ open Monad.Notation(M)
 let (let$) : entry M.t -> (value -> 'a M.t) -> 'a M.t =
   fun x k env -> let en = x env in k en.v (Env.extend en env)
 
-let lift : 'a Quote.M.t -> 'a M.t = fun c env -> c (Env.width env)
+let liftQ : 'a Quote.M.t -> 'a M.t =
+  fun k env -> k (Env.width env)
+
+let liftR : 'a C.ToRaw.M.t -> 'a M.t =
+  fun k env -> k (Env.map (fun { n; _ } -> n) env)
 
 let fresh ?v ty n =
-  let* v = lift @@ match v with
-                   | None -> fresh ty
-                   | Some v -> Quote.M.return v
+  let* v = liftQ @@ match v with
+                    | None -> fresh ty
+                    | Some v -> Quote.M.return v
   in
   return { n; v; ty = Some ty; }
 
+let raw_of_typ : value -> Raw.term M.t =
+  fun tm ->
+  let* tm = liftQ @@ Quote.typ tm in
+  let* tm = liftR @@ Core.ToRaw.term tm in
+  return tm
+
 let check_conv ~expected ~actual loc =
-  let* expected = lift @@ Quote.typ expected in
-  let* actual = lift @@ Quote.typ actual in
+  if !Options.verbose then
+    Format.eprintf "@[%a@] =? @[%a@]@."
+      Sexplib.Sexp.pp_hum (sexp_of_value expected)
+      Sexplib.Sexp.pp_hum (sexp_of_value expected);
+  let* expected = liftQ @@ Quote.typ expected in
+  let* actual = liftQ @@ Quote.typ actual in
   if not (Core.equal_term expected actual)
-  then Error.unexpected_type ~expected ~actual loc;
-  return ()
+  then
+      let* expected = liftR @@ C.ToRaw.term expected in
+      let* actual = liftR @@ C.ToRaw.term actual in
+      Error.unexpected_type ~expected ~actual loc
+  else
+    return ()
 
 let rec check : expected:ty -> R.term -> C.term M.t =
   fun ~expected (Position.{ value = r; position = loc; } as tm) ->
@@ -293,7 +315,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
         return @@ C.Build.forall ~loc a f
 
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr ~expected:`Univ ~actual loc
 
      end
@@ -306,7 +328,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
         return @@ C.Build.lam ~loc body
 
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr ~expected:`Forall ~actual loc
      end
 
@@ -316,7 +338,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
         return @@ C.Build.nat ~loc ()
 
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr ~expected:`Univ ~actual loc
      end
 
@@ -328,7 +350,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
         else Error.universe_inconsistency loc
 
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr ~expected:`Univ ~actual loc
      end
 
@@ -367,7 +389,7 @@ and check_is_ty : R.ty -> C.ty M.t =
      | Type ->
         return tm
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr ~expected:`Univ ~actual loc
      end
 
@@ -387,7 +409,7 @@ and infer : R.term -> (C.term * ty) M.t =
         return @@ (C.Build.app m n, eval_clo1 f msem)
 
      | actual ->
-        let* actual = lift @@ Quote.typ actual in
+        let* actual = raw_of_typ actual in
         Error.unexpected_head_constr loc ~expected:`Forall ~actual
      end
 

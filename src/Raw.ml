@@ -221,5 +221,5 @@ let name_option_of_pattern Position.{ value; _ } =
   | PVar x -> Some x
 
 let name_of_pattern p =
-  Option.value ~default:Name.dummy @@ name_option_of_pattern p
+  Name.of_option @@ name_option_of_pattern p
 

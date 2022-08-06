@@ -49,9 +49,11 @@ and t = phrase list
 
 type ty = term
 
-val sexp_of_t : t -> Sexplib.Sexp.t
+val sexp_of_term : term -> Sexplib.Sexp.t
 val sexp_of_bound1 : bound1 -> Sexplib.Sexp.t
 val sexp_of_bound2 : bound2 -> Sexplib.Sexp.t
+val sexp_of_phrase : phrase -> Sexplib.Sexp.t
+val sexp_of_t : t -> Sexplib.Sexp.t
 
 val equal_term : term -> term -> bool
 
@@ -84,8 +86,16 @@ module Build : sig
              phrase
 end
 
+module ToRaw : sig
+  type env = Name.t DeBruijn.Env.t
+  module M : Monad.Plain with type 'a t = env -> 'a
+  val term : term -> env -> Raw.term
+  val bound1 : bound1 -> Raw.bound1 M.t
+  val bound2 : bound2 -> Raw.bound2 M.t
+  val phrase : phrase -> (Raw.phrase * env) M.t
+  val file : t -> Raw.t M.t
+end
+
 module PPrint : sig
-  val term : term -> PPrint.document
-  val phrase : phrase -> PPrint.document
   val file : t -> PPrint.document
 end
