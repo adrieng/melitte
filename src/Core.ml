@@ -18,7 +18,9 @@ type term_desc =
 and term =
   {
     t_desc : term_desc;
-    t_loc : Position.t; [@equal fun _ _ -> true]
+    t_loc : Position.t;
+    [@equal fun _ _ -> true]
+    [@sexp_drop_if fun _ -> true]
   }
 
 and bound1 =
@@ -40,7 +42,9 @@ and phrase_desc =
 and phrase =
   {
     ph_desc : phrase_desc;
-    ph_loc : Position.t; [@equal fun _ _ -> true]
+    ph_loc : Position.t;
+    [@equal fun _ _ -> true]
+    [@sexp_drop_if fun _ -> true]
   }
 
 and t = phrase list [@@deriving sexp_of, eq]
