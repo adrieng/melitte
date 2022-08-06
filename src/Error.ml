@@ -1,5 +1,5 @@
 type error =
-  | Internal of { message : string; backtrace : string; }
+  | Internal of string
   | Syntax of Position.t * string
   | Unbound_identifier of Position.t * string
   | Could_not_synthesize of Position.t
@@ -12,11 +12,11 @@ type error =
   | Universe_inconsistency of Position.t
 
 let print fmt = function
-  | Internal { message; backtrace; } ->
-     Format.fprintf fmt "internal error (%s), please open an issue %s@\n%s"
+  | Internal message ->
+     Format.fprintf fmt "internal error (%s), please open an issue at %s@\n%s"
        message
        "https://github.com/adrieng/melitte/issues"
-       backtrace
+       (Printexc.get_backtrace ())
   | Syntax (loc, s) ->
      Format.fprintf fmt "%s: %s" (Position.to_string loc) s
   | Unbound_identifier (loc, s) ->
@@ -49,11 +49,7 @@ was expected"
 exception Error of error
 
 let internal message =
-  let b = Printexc.backtrace_status () in
-  Printexc.record_backtrace true;
-  let backtrace = try failwith "" with Failure _ -> Printexc.get_backtrace () in
-  Printexc.record_backtrace b;
-  raise (Error (Internal { message; backtrace; }))
+  raise (Error (Internal message))
 
 let syntax reason startp endp =
   raise (Error (Syntax (Position.lex_join startp endp, reason)))

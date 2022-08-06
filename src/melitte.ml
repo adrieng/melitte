@@ -40,9 +40,12 @@ let () =
          " set output encoding";
          "-type-in-type", Set Options.type_in_type,
          " accept type-in-type (inconsistent)";
+         "-debug", Set Options.debug,
+         " enable debugging features";
        ]
     )
     (fun s -> inputs := `File s :: !inputs)
     (Printf.sprintf "Usage: %s [OPTIONS] file1.tt ... fileN.tt" Sys.argv.(0));
+  Printexc.record_backtrace !Options.debug;
   if !process_stdin then inputs := !inputs @ [`Stdin];
   List.iter process !inputs
