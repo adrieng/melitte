@@ -7,7 +7,7 @@ val const : ℕ → ℕ = λ x ⇒ zero
 val id : ∀ (A : 𝕌) → A → A = λ A x ⇒ x
 
 val iter : ∀ (A : 𝕌) (f : A → A) → ℕ → A → A =
-  λ A f n z ⇒ elim n { zero ⇒ z | succ r ⇒ f r }
+  λ A f n z ⇒ elim n with _ ⇒ A { zero ⇒ z | succ _, r ⇒ f r }
 
 val add : ℕ → ℕ → ℕ = iter ℕ (λ x ⇒ succ x)
 
