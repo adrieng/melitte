@@ -84,4 +84,5 @@ and comments n lexbuf =
     | comment_start -> comments (n + 1) lexbuf
     | comment_stop -> comments (n - 1) lexbuf
     | eof -> error "unterminated comment" lexbuf
-    | _ -> comments n lexbuf
+    | any -> comments n lexbuf
+    | _ -> error "bad token" lexbuf
