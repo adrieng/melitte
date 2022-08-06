@@ -6,7 +6,7 @@
 
 %token<string> ID
 
-%token LAM FORALL LET IN TYPE NAT ZERO SUC ELIM WITH VAL
+%token LAM FORALL LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR
 %token UNDERSCORE COLON BAR COMMA
@@ -88,6 +88,7 @@ hyp:
 
 phrase_desc:
 | VAL name = name COLON ty = ty EQ body = term { Val { name; ty; body; } }
+| EVAL body = term COLON ty = ty { Eval { body; ty; } }
 
 %inline phrase:
 | p = located(phrase_desc) { p }

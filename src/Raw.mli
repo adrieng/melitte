@@ -57,6 +57,7 @@ and ty = term
 
 type phrase_desc =
   | Val of { name : Name.t; ty : ty; body : term; }
+  | Eval of { body : term; ty : term; }
 
 and phrase = phrase_desc Position.located
 

@@ -240,10 +240,6 @@ end
 
 (* {2 Normalization} *)
 
-let nf ~env ~ty ~tm =
-  let open Quote in
-  M.run (Env.width env) (normal_ ~ty:(eval ty env) ~tm:(eval tm env))
-
 (* {2 Type checking} *)
 
 module M = struct
@@ -260,6 +256,11 @@ let liftQ : 'a Quote.M.t -> 'a M.t =
 
 let liftR : 'a C.ToRaw.M.t -> 'a M.t =
   fun k env -> k (Env.map (fun { n; _ } -> n) env)
+
+let nf ~ty ~tm =
+  let* tm = eval tm in
+  let* ty = eval ty in
+  liftQ @@ Quote.normal_ ~ty ~tm
 
 let fresh ?v ty n =
   let* v = liftQ @@ match v with
@@ -472,6 +473,15 @@ let phrase : R.phrase -> (C.phrase * env) M.t =
        M.get
      in
      return @@ (C.Build.val_ ~loc ~user:name ~ty ~body (), env)
+  | Eval { body; ty; } ->
+     let* ty = check_is_ty ty in
+     let* body =
+       let* tysem = eval ty in
+       check ~expected:tysem body
+     in
+     let* body = nf ~ty ~tm:body in
+     let* env = M.get in
+     return @@ (C.Build.eval ~loc ~body ~ty (), env)
 
 let rec check = function
   | [] ->

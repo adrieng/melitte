@@ -38,6 +38,7 @@ and ty = term
 
 type phrase_desc =
   | Val of { name : Name.t; ty : ty; body : term; }
+  | Eval of { body : term; ty : ty; }
 
 and phrase = phrase_desc Position.located
 
@@ -209,6 +210,8 @@ module PPrint = struct
   and phrase_desc = function
     | Val { name; ty; body; } ->
        bindN (!^ "val") equals [hyp (Build.pvar name) ty] (term body)
+    | Eval { body; ty; } ->
+       bindN (!^ "eval") colon [term body] (term ty)
 
   and phrase p = Position.located phrase_desc p
 

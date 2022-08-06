@@ -23,6 +23,7 @@ let keyword_or_ident =
       ["elim"], ELIM;
       ["with"], WITH;
       ["val"], VAL;
+      ["eval"], EVAL;
     ]
 
 (** {1 Error handling} *)

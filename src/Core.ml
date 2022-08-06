@@ -38,6 +38,7 @@ and bound2 =
 
 and phrase_desc =
   | Val of { user : Name.t option; ty : term; body : term; }
+  | Eval of { body : term; ty : term; }
 
 and phrase =
   {
@@ -128,6 +129,11 @@ module ToRaw = struct
          let* ty = term ty in
          let* env = M.get in
          return (Raw.Val { name; ty; body; }, DeBruijn.Env.extend name env)
+      | Eval { ty; body; } ->
+         let* ty = term ty in
+         let* body = term body in
+         let* env = M.get in
+         return (Raw.Eval { ty; body; }, env)
     in
     return @@ (Position.with_pos ph_loc desc, env)
 
@@ -168,6 +174,9 @@ module Build = struct
 
   let val_ ?(loc = Position.dummy) ?user ~ty ~body () =
     { ph_loc = loc; ph_desc = Val { user; ty; body; } }
+
+  let eval ?(loc = Position.dummy) ~ty ~body () =
+    { ph_loc = loc; ph_desc = Eval { body; ty; } }
 end
 
 module PPrint = struct
