@@ -142,11 +142,10 @@ end
 
 module PPrint = struct
   let term te =
-    Raw.PPrint.term (raw_of DeBruijn.Env.empty te)
+    sexp_of_term te |> Sexplib.Sexp.to_string_hum |> PPrint.string
 
   let phrase ph =
-    let _, raw = raw_of_phrase DeBruijn.Env.empty ph in
-    Raw.PPrint.phrase raw
+    sexp_of_phrase ph |> Sexplib.Sexp.to_string_hum |> PPrint.string
 
   let file phs =
     let _, raw = raw_of_file DeBruijn.Env.empty phs in
