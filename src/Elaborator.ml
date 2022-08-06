@@ -1,3 +1,5 @@
+open Sexplib.Conv
+
 module R = Raw
 module C = Core
 
@@ -30,12 +32,12 @@ and env = entry Env.t
 
 and entry = {
     v : value;                  (** Used for evaluation. *)
-    ty : ty option;             (** Used only during type checking, in which
+    ty : value option;          (** Used only during type checking, in which
                                     case this field is never [None]. *)
-    n : Name.t;                 (** Used only for scoping. *)
-  }
+    n : Name.t;                 (** Used only for scoping during elaboration. *)
+  }  [@@deriving sexp_of]
 
-and ty = value
+type ty = value
 
 (* {2 Utilities} *)
 
@@ -131,6 +133,10 @@ and eval_clo1 (C1 (env, Bound1 { body; user; })) v =
 
 and eval_clo2 (C2 (env, Bound2 { body; user1; user2; })) v1 v2 =
   eval body (extend ?user:user2 v2 (extend ?user:user1 v1 env))
+
+let pp_env : env Sigs.Formatter.t =
+  fun fmt env ->
+  Sexplib.Sexp.pp_hum fmt @@ DeBruijn.Env.sexp_of_t sexp_of_entry env
 
 (* {2 Quotation} *)
 
@@ -242,12 +248,6 @@ module M = struct
 end
 open Monad.Notation(M)
 
-(*   let (let$) : ty * value option -> *)
-
-(* let (let$) : C.ty -> (value -> 'a M.t) -> 'a M.t = *)
-(*   fun ty k free -> *)
-(*   k (Reflect { ty; tm = Var (DeBruijn.Lv.last ~free); }) (free + 1) *)
-
 let (let$) : entry M.t -> (value -> 'a M.t) -> 'a M.t =
   fun x k env -> let en = x env in k en.v (Env.extend en env)
 
@@ -301,7 +301,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
   | Lam body ->
      begin match expected with
      | Forall (a, f) ->
-        let$ x = fresh a (clo1_name f) in
+        let$ x = fresh a (bound1_name body) in
         let* body = check_bound1 ~expected:(eval_clo1 f x) body in
         return @@ C.Build.lam ~loc body
 

@@ -52,4 +52,6 @@ module Env : sig
 
   (** See {! List.fold_right}. *)
   val fold : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  val sexp_of_t : ('a -> Sexplib.Sexp.t) -> 'a t -> Sexplib.Sexp.t
 end

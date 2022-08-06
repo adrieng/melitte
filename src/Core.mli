@@ -50,6 +50,8 @@ and t = phrase list
 type ty = term
 
 val sexp_of_t : t -> Sexplib.Sexp.t
+val sexp_of_bound1 : bound1 -> Sexplib.Sexp.t
+val sexp_of_bound2 : bound2 -> Sexplib.Sexp.t
 
 val equal_term : term -> term -> bool
 

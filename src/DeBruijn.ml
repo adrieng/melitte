@@ -32,7 +32,7 @@ let ix_of_lv ~free n =
   free - n - 1
 
 module Env = struct
-  type 'a t = { w : int; c : 'a list; }
+  type 'a t = { w : int; c : 'a list; } [@@deriving sexp_of]
 
   let width { w; _ } = w
 

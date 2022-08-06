@@ -20,7 +20,8 @@ let process inp =
     print_newline (); flush stdout;
     let syn = Elaborator.(M.run @@ check raw) in
     Printf.printf "{- Elaborated source code -}\n";
-    ExtPrint.to_out (Core.PPrint.file syn)
+    ExtPrint.to_out (Core.PPrint.file syn);
+    print_newline (); flush stdout;
   with Error.Error err ->
     Format.eprintf "%a@." Error.print err;
     exit 1
