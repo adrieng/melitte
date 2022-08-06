@@ -17,8 +17,8 @@ let process inp =
     let raw = parse inp in
     Printf.printf "{- Raw source code -}\n";
     ExtPrint.to_out (Raw.PPrint.file raw);
+    print_newline (); flush stdout;
     let syn = Elaborator.(M.run @@ check raw) in
-    print_newline ();
     Printf.printf "{- Elaborated source code -}\n";
     ExtPrint.to_out (Core.PPrint.file syn)
   with Error.Error err ->

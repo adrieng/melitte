@@ -6,7 +6,7 @@
 
 %token<string> ID
 
-%token LAM FORALL LET IN TYPE NAT ZERO SUCC ELIM WITH VAL
+%token LAM FORALL LET IN TYPE NAT ZERO SUC ELIM WITH VAL
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR
 %token UNDERSCORE COLON BAR COMMA
@@ -33,7 +33,7 @@ very_simple_term_:
 | TYPE { Type }
 | NAT { Nat }
 | ZERO { Zero }
-| SUCC t = very_simple_term { Succ t }
+| SUC t = very_simple_term { Suc t }
 | te = parens(term_) { te }
 
 %inline very_simple_term:
@@ -62,7 +62,7 @@ term_:
 | ELIM scrut = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term
-  BAR SUCC case_succ = bind2(DARR)
+  BAR SUC case_succ = bind2(DARR)
   RBRACE { Natelim { scrut; motive; case_zero; case_succ; } }
 
 %inline term:

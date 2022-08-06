@@ -8,7 +8,7 @@ type term_desc =
   | App of term * term
   | Nat
   | Zero
-  | Succ of term
+  | Suc of term
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
@@ -72,8 +72,8 @@ let rec raw_of_desc env = function
      Raw.Nat
   | Zero ->
      Raw.Zero
-  | Succ t ->
-     Raw.Succ (raw_of env t)
+  | Suc t ->
+     Raw.Suc (raw_of env t)
   | Natelim { scrut; motive; case_zero; case_succ; } ->
      Raw.Natelim { scrut = raw_of env scrut;
                    motive = bound1 env motive;
@@ -125,7 +125,7 @@ module Build = struct
 
   let zero ?loc () = desc ?loc Zero
 
-  let succ ?loc t = desc ?loc @@ Succ t
+  let succ ?loc t = desc ?loc @@ Suc t
 
   let natelim ?loc ~scrut ~motive ~case_zero ~case_succ () =
     desc ?loc @@ Natelim { scrut; motive; case_zero; case_succ; }

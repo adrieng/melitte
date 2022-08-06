@@ -12,7 +12,7 @@ type term_desc =
   | App of term * term
   | Nat
   | Zero
-  | Succ of term
+  | Suc of term
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
@@ -57,7 +57,7 @@ module Build = struct
     Position.unknown_pos (Var id)
 
   let succ t =
-    Position.{ value = Succ t;
+    Position.{ value = Suc t;
                position = t.position; }
 
   let lambda ids body =
@@ -85,26 +85,32 @@ module PPrint = struct
   open PPrint
   module U = UnicodeSigil
 
-  let name = string
+  let name = utf8string
 
   let pattern_desc = function
-    | PWildcard -> string "_"
+    | PWildcard -> !^ "_"
     | PVar x -> name x
 
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ _ | App _) as t ->
-       simple_term_desc t
+    | (Var _ | Type | Nat | Zero | Suc _ | App _) as t ->
+       group (simple_term_desc t)
 
     | Lam _ as t ->
-       let rec print_lam = function
+       let rec lam = function
          | Lam (Bound1 { pat; body; }) ->
-            pattern pat ^/^ print_lam body.Position.value
-         | t ->
-            U.(doc darrow) ^/^ term_desc t
+            let pats, body = lam body.Position.value in
+            pattern pat :: pats, body
+         | body ->
+            [], body
        in
-       group (U.(doc lambda) ^/^ print_lam t)
+       let patterns, body = lam t in
+       bindN
+         U.(doc lambda)
+         U.(doc darrow)
+         patterns
+         (term_desc body)
 
     | Let { def; ty; body = Bound1 { pat; body; }; } ->
        group
@@ -137,12 +143,15 @@ module PPrint = struct
     | Natelim { scrut; motive; case_zero; case_succ; } ->
        let m = bind1 (!^ " with") U.(doc darrow) motive in
        prefix 2 1
-         (group (string "elim" ^/^ term scrut ^^ m))
-         (braces (def empty U.(doc darrow) (!^ "zero") (term case_zero)
-                  ^/^ (bind2 bar U.(doc darrow) case_succ)))
+         (group (!^ "elim" ^/^ term scrut ^^ m))
+         (braces @@ separate (break 1 ^^ bar)
+                      [
+                        bind0 (!^ " zero") U.(doc darrow) case_zero;
+                        bind2 (!^ " succ") U.(doc darrow) case_succ;
+                      ] ^^ break 1)
 
   and simple_term_desc = function
-    | (Var _ | Type | Nat | Zero | Succ _) as t ->
+    | (Var _ | Type | Nat | Zero | Suc _) as t ->
        very_simple_term_desc t
 
     | App (t, u) ->
@@ -162,10 +171,10 @@ module PPrint = struct
        U.(doc nat)
 
     | Zero ->
-       string "zero"
+       !^ "zero"
 
-    | Succ t ->
-       prefix 2 1 (!^ "succ") (simple_term t)
+    | Suc t ->
+       prefix 2 1 (!^ "suc") (simple_term t)
 
     | t ->
        parens (term_desc t)
@@ -180,21 +189,26 @@ module PPrint = struct
 
   and typ_desc tyd = term_desc tyd
 
-  and def kw sep h body =
-    prefix 2 1 (group (kw ^^ space ^^ h ^^ space ^^ sep)) body
+  and bindN kw sep (heads : document list) body =
+    prefix 2 1
+      (prefix 2 1 kw (group @@ separate (break 1) (heads @ [sep])))
+      body
+
+  and bind0 kw sep body =
+    bindN kw sep [] (term body)
 
   and bind1 kw sep (Bound1 { pat; body; }) =
-    def kw sep (pattern pat) (term body)
+    bindN kw sep [pattern pat] (term body)
 
   and bind2 kw sep (Bound2 { pat1; pat2; body; }) =
-    def kw sep (pattern pat1 ^^ comma ^^ pattern pat2) (term body)
+    bindN kw sep [pattern pat1 ^^ comma; pattern pat2] (term body)
 
   and hyp (p : pattern) ty =
     group (pattern p ^^ space ^^ colon ^/^ typ ty)
 
   and phrase_desc = function
     | Val { name; ty; body; } ->
-       def (string "val") equals (hyp (Build.pvar name) ty) (term body)
+       bindN (!^ "val") equals [hyp (Build.pvar name) ty] (term body)
 
   and phrase p = Position.located phrase_desc p
 

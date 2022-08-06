@@ -10,7 +10,7 @@ type term_desc =
   | App of term * term
   | Nat
   | Zero
-  | Succ of term
+  | Suc of term
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;

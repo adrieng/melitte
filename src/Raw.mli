@@ -28,7 +28,7 @@ type term_desc =
   (** Type of natural numbers. *)
   | Zero
   (** Nullary constructor of [Nat]. *)
-  | Succ of term
+  | Suc of term
   (** Unary constructor of [Nat]. *)
   | Natelim of { scrut : term;
                  motive : bound1;

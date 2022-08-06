@@ -10,7 +10,7 @@ type value =
   | Type
   | Nat
   | Zero
-  | Succ of value
+  | Suc of value
 
 and neutral =
   | Var of DeBruijn.Lv.t
@@ -101,8 +101,8 @@ let rec eval : C.term -> env -> value =
   | C.Zero ->
      Zero
 
-  | C.Succ t ->
-     Succ (eval t env)
+  | C.Suc t ->
+     Suc (eval t env)
 
   | C.Natelim { scrut; motive; case_zero; case_succ; } ->
      eval_nat_elim
@@ -124,7 +124,7 @@ and eval_nat_elim d m u0 uN =
   match d with
   | Zero ->
      u0
-  | Succ n ->
+  | Suc n ->
      let vp = eval_nat_elim n m u0 uN in
      eval_clo2 uN n vp
   | Reflect { ty = Nat; tm; } ->
@@ -168,7 +168,7 @@ module Quote = struct
        let$ x1 = fresh ~n Nat in
        let* case_succ =
          let$ x2 = fresh ~n (eval_clo1 motive x1) in
-         normal_clo2 ~ty:(eval_clo1 motive (Succ x1)) case_succ x1 x2
+         normal_clo2 ~ty:(eval_clo1 motive (Suc x1)) case_succ x1 x2
        in
        let* motive = typ_clo1 motive x1 in
        return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_succ ()
@@ -190,7 +190,7 @@ module Quote = struct
     | Nat, Zero ->
        return @@ C.Build.zero ()
 
-    | Nat, Succ tm ->
+    | Nat, Suc tm ->
        let* tm = normal_ ~ty ~tm in
        return @@ C.Build.succ tm
 
@@ -219,7 +219,7 @@ module Quote = struct
        let* a = typ a in
        return @@ C.Build.forall a f
 
-    | Reflect _ | Zero | Succ _ | Lam _ ->
+    | Reflect _ | Zero | Suc _ | Lam _ ->
        Error.internal "ill-typed quotation"
 
   and typ_clo1 (C1 (_, Bound1 { user; _ }) as clo) x =
@@ -322,7 +322,7 @@ let rec check : expected:ty -> R.term -> C.term M.t =
         Error.unexpected_head_constr ~expected:`Univ ~actual loc
      end
 
-  | Var _ | App _ | Zero | Succ _ | Natelim _ ->
+  | Var _ | App _ | Zero | Suc _ | Natelim _ ->
      let* tm, actual = infer tm in
      let* () = check_conv ~expected ~actual loc in
      return tm
@@ -351,7 +351,7 @@ and check_is_ty : R.ty -> C.ty M.t =
   | Let _ ->
      assert false               (* TODO *)
 
-  | Var _ | App _ | Natelim _ | Zero | Succ _ ->
+  | Var _ | App _ | Natelim _ | Zero | Suc _ ->
      let* tm, ty = infer r in
      begin match ty with
      | Type ->
@@ -384,7 +384,7 @@ and infer : R.term -> (C.term * ty) M.t =
   | R.Zero ->
      return @@ (C.Build.zero ~loc (), Nat)
 
-  | R.Succ m ->
+  | R.Suc m ->
      let* m = check ~expected:Nat m in
      return @@ (C.Build.succ ~loc m, Nat)
 
@@ -399,7 +399,7 @@ and infer : R.term -> (C.term * ty) M.t =
      let* case_succ =
        let$ x1 = fresh Nat in
        let$ _ = fresh (eval_clo1 motsem x1) in
-       check_bound2 ~expected:(eval_clo1 motsem (Succ x1)) case_succ
+       check_bound2 ~expected:(eval_clo1 motsem (Suc x1)) case_succ
      in
      let* resty =
        let* scrutsem = eval scrut in

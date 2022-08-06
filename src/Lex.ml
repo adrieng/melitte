@@ -19,7 +19,7 @@ let keyword_or_ident =
       ["Type"; "𝕌"], TYPE;
       ["Nat"; "ℕ"], NAT;
       ["zero"], ZERO;
-      ["succ"], SUCC;
+      ["suc"], SUC;
       ["elim"], ELIM;
       ["with"], WITH;
       ["val"], VAL;
