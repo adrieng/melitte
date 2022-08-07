@@ -33,8 +33,8 @@ type term_desc =
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound2; }
-                 (** Dependent elimination form for natural numbers. *)
+                 case_suc : bound2; }
+  (** Dependent elimination form for natural numbers. *)
   | Type
   (** Universe of small types. *)
 
@@ -64,14 +64,40 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build : sig
-  val pvar : Name.t -> pattern
+  val pvar : ?loc:Position.t -> name:Name.t -> unit -> pattern
+  val pwildcard : ?loc:Position.t -> unit -> pattern
+  val var : ?loc:Position.t -> name:Name.t -> unit -> term
+  val let_ : ?loc:Position.t -> def:term -> ty:ty -> body:bound1 -> unit -> term
+  val forall : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
+  val forall_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+                 unit -> ty
+  val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
+  val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term
+  val lam_n : ?loc:Position.t ->
+              params:pattern list ->
+              body:term ->
+              unit -> term
+  val app : ?loc:Position.t -> func:term -> arg:term -> unit -> term
+  val app_n : ?loc:Position.t -> func:term -> args:term list -> unit -> term
+  val nat : ?loc:Position.t -> unit -> term
+  val zero : ?loc:Position.t -> unit -> term
+  val suc : ?loc:Position.t -> t:term -> unit -> term
+  val lit : ?loc:Position.t -> k:int -> unit -> term
+  val natelim : ?loc:Position.t ->
+                scrut:term ->
+                motive:bound1 ->
+                case_zero:term ->
+                case_suc:bound2 ->
+                unit -> term
+  val typ : ?loc:Position.t -> unit -> term
   val bound1 : pattern -> term -> bound1
   val bound2 : pattern -> pattern -> term -> bound2
-  val var : Name.t -> term
-  val lambda : pattern list -> term -> term
-  val forall : (pattern * ty) list -> ty -> ty
-  val succ : term -> term
-  val arrow : ty -> ty -> ty
+  val val_ : ?loc:Position.t ->
+             name:Name.t ->
+             ty:term ->
+             body:term ->
+             unit -> phrase
+  val eval : ?loc:Position.t -> ty:term -> body:term -> unit -> phrase
 end
 
 module PPrint : sig

@@ -12,7 +12,7 @@ type term_desc =
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound2; }
+                 case_suc : bound2; }
   | Type
 
 and term =
@@ -66,7 +66,7 @@ module ToRaw = struct
       | Some name -> name
       | None -> "_x" ^ string_of_int (DeBruijn.Env.width env)
     in
-    f (Raw.Build.pvar name) (DeBruijn.Env.extend name env)
+    f (Raw.Build.pvar ~name ()) (DeBruijn.Env.extend name env)
 
   let rec term { t_desc; t_loc; } =
     let* desc =
@@ -99,12 +99,12 @@ module ToRaw = struct
       | Suc t ->
          let* t = term t in
          return @@ Raw.Suc t
-      | Natelim { scrut; motive; case_zero; case_succ; } ->
+      | Natelim { scrut; motive; case_zero; case_suc; } ->
          let* scrut = term scrut in
          let* motive = bound1 motive in
          let* case_zero = term case_zero in
-         let* case_succ = bound2 case_succ in
-         return @@ Raw.Natelim { scrut; motive; case_zero; case_succ; }
+         let* case_suc = bound2 case_suc in
+         return @@ Raw.Natelim { scrut; motive; case_zero; case_suc; }
     in
     return @@ Position.with_pos t_loc desc
 
@@ -165,10 +165,10 @@ module Build = struct
 
   let zero ?loc () = desc ?loc Zero
 
-  let succ ?loc t = desc ?loc @@ Suc t
+  let suc ?loc t = desc ?loc @@ Suc t
 
-  let natelim ?loc ~scrut ~motive ~case_zero ~case_succ () =
-    desc ?loc @@ Natelim { scrut; motive; case_zero; case_succ; }
+  let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
+    desc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
   let typ ?loc () = desc ?loc Type
 

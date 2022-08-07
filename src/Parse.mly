@@ -1,10 +1,11 @@
 %{ (* -*- mode: tuareg -*- *)
    open Raw
 
-   let v = Position.value
+   module B = Build
 %}
 
 %token<string> ID
+%token<int> INT
 
 %token LAM FORALL LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
 %token LPAREN RPAREN LBRACE RBRACE
@@ -23,17 +24,18 @@
 | LPAREN x = X RPAREN { x }
 
 %inline located(X):
-| x = X { Position.with_poss $startpos $endpos x }
+| x = X { x ~loc:(Position.lex_join $startpos $endpos) () }
 
 %inline name:
 | id = ID { id }
 
 very_simple_term_:
-| id = name { Var id }
-| TYPE { Type }
-| NAT { Nat }
-| ZERO { Zero }
-| SUC t = very_simple_term { Suc t }
+| name = name { B.var ~name }
+| TYPE { B.typ }
+| NAT { B.nat }
+| k = INT { B.lit ~k }
+| ZERO { B.zero }
+| SUC t = very_simple_term { B.suc ~t }
 | te = parens(term_) { te }
 
 %inline very_simple_term:
@@ -41,7 +43,7 @@ very_simple_term_:
 
 simple_term_:
 | te = very_simple_term_ { te }
-| f = simple_term a = very_simple_term { App (f, a) }
+| func = simple_term arg = very_simple_term { B.app ~func ~arg }
 
 %inline simple_term:
 | located(simple_term_) { $1 }
@@ -50,20 +52,25 @@ weakened_term(X):
 | b = hyp X te = term { (b, te) }
 
 motive:
-| WITH p = pattern DARR ty = ty { Build.bound1 p ty }
+| WITH p = pattern DARR ty = ty { B.bound1 p ty }
 
 term_:
-| t = simple_term_ { t }
-| LAM ids = pattern+ DARR t = term { v @@ Build.lambda ids t }
+| t = simple_term_
+  { t }
+| LAM params = pattern+ DARR body = term
+  { B.lam_n ~params ~body }
 | LET p = pattern COLON ty = ty EQ def = term IN body = term
-  { Let { def; ty; body = Build.bound1 p body; } }
-| FORALL hyps = parens(hyp)+ ARR b = ty { v @@ Build.forall hyps b }
-| a = term ARR b = term { v @@ Build.arrow a b }
+  { B.let_ ~def ~ty ~body:(B.bound1 p body) }
+| FORALL params = parens(hyp)+ ARR body = ty
+  { B.forall_n ~params ~body }
+| dom = term ARR cod = term
+  { B.arrow ~dom ~cod }
 | ELIM scrut = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term
-  BAR SUC case_succ = bind2(DARR)
-  RBRACE { Natelim { scrut; motive; case_zero; case_succ; } }
+  BAR SUC case_suc = bind2(DARR)
+  RBRACE
+  { B.natelim ~scrut ~motive ~case_zero ~case_suc }
 
 %inline term:
 | located(term_) { $1 }
@@ -77,8 +84,8 @@ bind2(SEP):
 | p1 = pattern COMMA p2 = pattern SEP t = term { Build.bound2 p1 p2 t }
 
 pattern_:
-| UNDERSCORE { PWildcard }
-| id = ID { PVar id }
+| UNDERSCORE { B.pwildcard }
+| name = ID { B.pvar ~name }
 
 %inline pattern:
 | located(pattern_) { $1 }
@@ -87,8 +94,10 @@ hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
 phrase_desc:
-| VAL name = name COLON ty = ty EQ body = term { Val { name; ty; body; } }
-| EVAL body = term COLON ty = ty { Eval { body; ty; } }
+| VAL name = name COLON ty = ty EQ body = term
+  { B.val_ ~name ~ty ~body }
+| EVAL body = term COLON ty = ty
+  { B.eval ~body ~ty }
 
 %inline phrase:
 | p = located(phrase_desc) { p }

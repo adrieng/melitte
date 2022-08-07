@@ -42,3 +42,7 @@ module Unicode = struct
     Array.iter (Buffer.add_utf_8_uchar b) a;
     Buffer.contents b
 end
+
+module Int = struct
+  let rec fold f n acc = if n = 0 then acc else f (fold f (n - 1) acc)
+end

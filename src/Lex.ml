@@ -3,7 +3,10 @@ open Parse
 (** {1 Utilities} *)
 
 let utf8_string_of_lexbuf lexbuf =
-  Sigs.Unicode.utf8_string_of_uchar_array (Sedlexing.lexeme lexbuf)
+  Sigs.Unicode.utf8_string_of_uchar_array @@ Sedlexing.lexeme lexbuf
+
+let int_of_lexbuf lexbuf =
+  int_of_string @@ utf8_string_of_lexbuf lexbuf
 
 let tabulate default table =
   let ht = Hashtbl.create 100 in
@@ -49,6 +52,8 @@ let quark = [%sedlex.regexp? alphabetic | other_alphabetic
 
 let atom = [%sedlex.regexp? quark, Star (quark | ascii_hex_digit)]
 
+let nat = [%sedlex.regexp? Plus ('0' .. '9')]
+
 let comment_start = [%sedlex.regexp? "{-"]
 
 let comment_stop = [%sedlex.regexp? "-}"]
@@ -72,6 +77,7 @@ let rec token lexbuf = match%sedlex lexbuf with
   | "," -> COMMA
   | '\\' | 955 -> LAM
 
+  | nat -> INT (int_of_lexbuf lexbuf)
   | atom -> keyword_or_ident (utf8_string_of_lexbuf lexbuf)
 
   | eof -> EOF

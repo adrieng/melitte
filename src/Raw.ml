@@ -16,7 +16,7 @@ type term_desc =
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound2; }
+                 case_suc : bound2; }
   | Type
 
 and term = term_desc Position.located
@@ -45,8 +45,11 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build = struct
-  let pvar id =
-    Position.unknown_pos (PVar id)
+  let pvar ?(loc = Position.dummy) ~name () =
+    Position.with_pos loc @@ PVar name
+
+  let pwildcard ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ PWildcard
 
   let bound1 pat body =
     Bound1 { pat; body; }
@@ -54,32 +57,62 @@ module Build = struct
   let bound2 pat1 pat2 body =
     Bound2 { pat1; pat2; body; }
 
-  let var id =
-    Position.unknown_pos (Var id)
+  let var ?(loc = Position.dummy) ~name () =
+    Position.with_pos loc @@ Var name
 
-  let succ t =
-    Position.{ value = Suc t;
-               position = t.position; }
+  let let_ ?(loc = Position.dummy) ~def ~ty ~body () =
+    Position.with_pos loc @@ Let { def; ty; body; }
 
-  let lambda ids body =
-    if ids = [] then invalid_arg "lambda: empty argument list";
-    List.fold_right
-      (fun id body ->
-        Position.{ value = Lam (bound1 id body);
-                   position = join id.position body.position; })
-      ids
-      body
+  let forall ?(loc = Position.dummy) ~dom ~cod () =
+    Position.with_pos loc @@ Forall (dom, cod)
 
-  let forall cx b =
-    List.fold_right
-      (fun (p, a) b -> Position.{ value = Forall (a, bound1 p b);
-                                  position = join (join p.position a.position)
-                                               b.position; })
-      cx b
+  let forall_n ?(loc = Position.dummy) ~params ~body () =
+    Position.{
+        (List.fold_right
+           (fun (p, a) b ->
+             with_pos (join (join p.position a.position) b.position)
+               (Forall (a, bound1 p b))) params body)
+      with position = loc;
+    }
 
-  let arrow a b =
-    let p = Position.{ value = PWildcard; position = a.position; } in
-    forall [(p, a)] b
+  let arrow ?(loc = Position.dummy) ~dom ~cod () =
+    forall ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
+
+  let lam ?(loc = Position.dummy) ~param ~body () =
+    Position.with_pos loc @@ Lam (bound1 param body)
+
+  let lam_n ?(loc = Position.dummy) ~params ~body () =
+    List.fold_right (fun param body -> lam ~loc ~param ~body ()) params body
+
+  let app ?(loc = Position.dummy) ~func ~arg () =
+    Position.with_pos loc @@ App (func, arg)
+
+  let app_n ?(loc = Position.dummy) ~func ~args () =
+    List.fold_left (fun func arg -> app ~loc ~func ~arg ()) func args
+
+  let nat ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ Nat
+
+  let zero ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ Zero
+
+  let suc ?(loc = Position.dummy) ~t () =
+    Position.with_pos loc @@ Suc t
+
+  let lit ?(loc = Position.dummy) ~k () =
+    Sigs.Int.fold (fun t -> suc ~loc ~t ()) k (zero ~loc ())
+
+  let natelim ?(loc = Position.dummy) ~scrut ~motive ~case_zero ~case_suc () =
+    Position.with_pos loc @@ Natelim { scrut; motive; case_zero; case_suc; }
+
+  let typ ?(loc = Position.dummy) () =
+    Position.with_pos loc Type
+
+  let val_ ?(loc = Position.dummy) ~name ~ty ~body () =
+    Position.with_pos loc @@ Val { name; ty; body; }
+
+  let eval ?(loc = Position.dummy) ~ty ~body () =
+    Position.with_pos loc @@ Eval { ty; body; }
 end
 
 module PPrint = struct
@@ -141,14 +174,14 @@ module PPrint = struct
        in
        group (print_fun t)
 
-    | Natelim { scrut; motive; case_zero; case_succ; } ->
+    | Natelim { scrut; motive; case_zero; case_suc; } ->
        let m = bind1 (!^ " with") U.(doc darrow) motive in
        prefix 2 1
          (group (!^ "elim" ^/^ term scrut ^^ m))
          (braces @@ separate (break 1 ^^ bar)
                       [
                         bind0 (!^ " zero") U.(doc darrow) case_zero;
-                        bind2 (!^ " succ") U.(doc darrow) case_succ;
+                        bind2 (!^ " suc") U.(doc darrow) case_suc;
                       ] ^^ break 1)
 
   and simple_term_desc = function
@@ -172,10 +205,25 @@ module PPrint = struct
        U.(doc nat)
 
     | Zero ->
-       !^ "zero"
+       !^ "0"
 
     | Suc t ->
-       prefix 2 1 (!^ "suc") (simple_term t)
+       let rec loop = function
+         | Zero ->
+            1, None
+         | Suc t ->
+            let k, r = loop t.Position.value in
+            k + 1, r
+         | r ->
+            1, Some r
+       in
+       let k, r = loop t.Position.value in
+       begin match r with
+       | None ->
+          !^ (string_of_int k)
+       | Some t ->
+          Sigs.Int.fold (prefix 2 1 (!^ "suc")) k (simple_term_desc t)
+       end
 
     | t ->
        parens (term_desc t)
@@ -209,7 +257,7 @@ module PPrint = struct
 
   and phrase_desc = function
     | Val { name; ty; body; } ->
-       bindN (!^ "val") equals [hyp (Build.pvar name) ty] (term body)
+       bindN (!^ "val") equals [hyp (Build.pvar ~name ()) ty] (term body)
     | Eval { body; ty; } ->
        bindN (!^ "eval") colon [term body] (term ty)
 

@@ -100,12 +100,12 @@ let rec eval : C.term -> env -> value =
   | C.Suc t ->
      Suc (eval t env)
 
-  | C.Natelim { scrut; motive; case_zero; case_succ; } ->
+  | C.Natelim { scrut; motive; case_zero; case_suc; } ->
      eval_nat_elim
        (eval scrut env)
        (close1 motive env)
        (eval case_zero env)
-       (close2 case_succ env)
+       (close2 case_suc env)
 
 and eval_app v w =
   match v with
@@ -166,12 +166,12 @@ module Quote = struct
        let* scrut = neutral scrut in
        let* case_zero = normal_ ~ty:(eval_clo1 motive Zero) ~tm:case_zero in
        let$ x1 = fresh ~n Nat in
-       let* case_succ =
+       let* case_suc =
          let$ x2 = fresh ~n (eval_clo1 motive x1) in
          normal_clo2 ~ty:(eval_clo1 motive (Suc x1)) case_succ x1 x2
        in
        let* motive = typ_clo1 motive x1 in
-       return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_succ ()
+       return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_suc ()
 
   and normal_ ~ty ~tm =
     match ty, tm with
@@ -192,7 +192,7 @@ module Quote = struct
 
     | Nat, Suc tm ->
        let* tm = normal_ ~ty ~tm in
-       return @@ C.Build.succ tm
+       return @@ C.Build.suc tm
 
     | _, Lam _ ->
        Error.internal "eta-expansion failure"
@@ -419,9 +419,9 @@ and infer : R.term -> (C.term * ty) M.t =
 
   | R.Suc m ->
      let* m = check ~expected:Nat m in
-     return @@ (C.Build.succ ~loc m, Nat)
+     return @@ (C.Build.suc ~loc m, Nat)
 
-  | Natelim { scrut; motive; case_zero; case_succ; } ->
+  | Natelim { scrut; motive; case_zero; case_suc; } ->
      let* scrut = check ~expected:Nat scrut in
      let* motive =
        let$ _ = fresh Nat (bound1_name motive) in
@@ -429,16 +429,16 @@ and infer : R.term -> (C.term * ty) M.t =
      in
      let* motsem = close1 motive in
      let* case_zero = check ~expected:(eval_clo1 motsem Zero) case_zero in
-     let* case_succ =
-       let$ x1 = fresh Nat (bound2_name_1 case_succ) in
-       let$ _ = fresh (eval_clo1 motsem x1) (bound2_name_2 case_succ) in
-       check_bound2 ~expected:(eval_clo1 motsem (Suc x1)) case_succ
+     let* case_suc =
+       let$ x1 = fresh Nat (bound2_name_1 case_suc) in
+       let$ _ = fresh (eval_clo1 motsem x1) (bound2_name_2 case_suc) in
+       check_bound2 ~expected:(eval_clo1 motsem (Suc x1)) case_suc
      in
      let* resty =
        let* scrutsem = eval scrut in
        return @@ eval_clo1 motsem scrutsem
      in
-     return @@ (C.Build.natelim ~scrut ~motive ~case_zero ~case_succ (), resty)
+     return @@ (C.Build.natelim ~scrut ~motive ~case_zero ~case_suc (), resty)
 
   | Let _ | Forall _ | Lam _ | Nat | Type ->
      Error.could_not_synthesize loc

@@ -14,7 +14,7 @@ type term_desc =
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
-                 case_succ : bound2; }
+                 case_suc : bound2; }
   | Type
 
 and term =
@@ -71,12 +71,12 @@ module Build : sig
   val app : ?loc:Position.t -> term -> term -> term
   val nat : ?loc:Position.t -> unit -> term
   val zero : ?loc:Position.t -> unit -> term
-  val succ : ?loc:Position.t -> term -> term
+  val suc : ?loc:Position.t -> term -> term
   val natelim : ?loc:Position.t ->
                 scrut:term ->
                 motive:bound1 ->
                 case_zero:term ->
-                case_succ:bound2 ->
+                case_suc:bound2 ->
                 unit -> term
   val typ : ?loc:Position.t -> unit -> term
   val val_ : ?loc:Position.t ->
