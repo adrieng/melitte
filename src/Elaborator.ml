@@ -151,7 +151,11 @@ module Quote = struct
   let (let$) : entry M.t -> (value -> 'a M.t) -> 'a M.t =
     fun x k free -> let en = x free in k en.v (free + 1)
 
-  let rec neutral = function
+  let rec neutral ne =
+    if !Options.verbose
+    then Format.eprintf "quote[neutral] %a@."
+           Sexplib.Sexp.pp_hum (sexp_of_neutral ne);
+    match ne with
     | Var lv ->
        let* free = M.get in
        return (C.Build.var (DeBruijn.ix_of_lv ~free lv))
@@ -174,6 +178,11 @@ module Quote = struct
        return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_suc ()
 
   and normal_ ~ty ~tm =
+    if !Options.verbose
+    then
+      Format.eprintf "quote[normal] %a : %a@."
+        Sexplib.Sexp.pp_hum (sexp_of_value ty)
+        Sexplib.Sexp.pp_hum (sexp_of_value tm);
     match ty, tm with
     | _, Reflect { tm; _ } ->
        neutral tm
@@ -206,7 +215,8 @@ module Quote = struct
   and typ =
     fun t ->
     if !Options.verbose
-    then Format.eprintf "quote %a@." Sexplib.Sexp.pp_hum (sexp_of_value t);
+    then
+      Format.eprintf "quote[type] %a@." Sexplib.Sexp.pp_hum (sexp_of_value t);
     match t with
     | Type ->
        return @@ C.Build.typ ()
@@ -226,8 +236,14 @@ module Quote = struct
     | Reflect { tm; _ } ->
        neutral tm
 
-    | Zero | Suc _ | Lam _ ->
-       Error.internal "ill-typed type quotation"
+    | Zero ->
+       Error.internal "ill-typed type quotation: zero"
+
+    | Suc _ ->
+       Error.internal "ill-typed type quotation: suc _"
+
+    | Lam _ ->
+       Error.internal "ill-typed type quotation: lam _"
 
   and typ_clo1 (C1 (_, Bound1 { user; _ }) as clo) x =
     let* body = typ (eval_clo1 clo x) in

@@ -43,6 +43,8 @@ let () =
          " accept type-in-type (inconsistent)";
          "-debug", Set Options.debug,
          " enable debugging features";
+         "-v", Set Options.verbose,
+         " print actions during elaboration";
        ]
     )
     (fun s -> inputs := `File s :: !inputs)
