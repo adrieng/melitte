@@ -64,6 +64,11 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build : sig
+  (* The functions declared in this submodule have all their arguments labelled
+     except for a trailing unit argument. This ensures that the optional [loc]
+     argument is never erased, making it possible to deal with locations in a
+     uniform way in {! Parse}. *)
+
   val pvar : ?loc:Position.t -> name:Name.t -> unit -> pattern
   val pwildcard : ?loc:Position.t -> unit -> pattern
   val var : ?loc:Position.t -> name:Name.t -> unit -> term

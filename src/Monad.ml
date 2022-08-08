@@ -52,3 +52,35 @@ module State(T : TYPE) = struct
 
   let set s _ = (), s
 end
+
+module Error(T : TYPE) = struct
+  type 'a t = ('a, T.t) Result.t
+
+  let return x = Ok x
+
+  let bind (type a b) (x : a t) (f : a -> b t) : b t =
+    match x with
+    | Ok x -> f x
+    | Error err -> Error err
+
+  let fail err = Error err
+
+  let run x = x
+end
+
+module ErrorT(T : TYPE)(M : Plain) = struct
+  type 'a t = ('a, T.t) Result.t M.t
+
+  let return x = M.return (Ok x)
+
+  let bind (type a b) (x : a t) (f : a -> b t) : b t =
+    M.bind x
+      (function
+       | Ok x -> f x
+       | Error err -> M.return (Error err))
+
+  let fail err = M.return @@ Error err
+
+  let lift x = M.bind x (fun v -> M.return @@ Ok v)
+end
+

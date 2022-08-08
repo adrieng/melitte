@@ -38,10 +38,9 @@ module Env : sig
   (** Extend an environment with a new entry, considered as the latest one. *)
   val extend : 'a -> 'a t -> 'a t
 
-  (** [lookup env ix] returns the value at De Bruijn index [ix] in [env]. It
+  (** [lookup ix env] returns the value at De Bruijn index [ix] in [env]. It
       raises [Not_found] if [ix] is not well-scoped in [env]. *)
-
-  val lookup : 'a t -> Ix.t -> 'a
+  val lookup : Ix.t -> 'a t -> 'a
 
   (** [find p env] returns the first value satisfying the predicate [p] in
       [env]. It raises [Not_found] in the absence of such a value. *)
@@ -52,6 +51,9 @@ module Env : sig
 
   (** See {! List.fold_right}. *)
   val fold : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
+  (** See {! List.to_seq}. *)
+  val to_seq : 'a t -> 'a Seq.t
 
   val sexp_of_t : ('a -> Sexplib.Sexp.t) -> 'a t -> Sexplib.Sexp.t
 end

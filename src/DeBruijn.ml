@@ -44,7 +44,7 @@ module Env = struct
 
   let extend v env = { w = env.w + 1; c = v :: env.c; }
 
-  let lookup env ix =
+  let lookup ix env =
     if ix >= env.w then raise Not_found;
     List.nth env.c ix
 
@@ -60,4 +60,7 @@ module Env = struct
 
   let map f { c; w; } =
     { c = List.map f c; w; }
+
+  let to_seq { c; _ } =
+    List.to_seq c
 end

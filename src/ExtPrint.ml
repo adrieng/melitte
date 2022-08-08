@@ -10,4 +10,7 @@ let to_string d =
   PPrint.ToBuffer.pretty ribbon width b d;
   Buffer.contents b
 
-let to_fmt pp fmt x = PPrint.ToFormatter.pretty ribbon width fmt (pp x)
+let pp fmt doc = PPrint.ToFormatter.pretty ribbon width fmt doc
+
+let to_fmt to_doc fmt x = pp fmt (to_doc x)
+

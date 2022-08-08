@@ -72,7 +72,7 @@ module ToRaw = struct
     let* desc =
       match t_desc with
       | Var ix ->
-         let* x = lookup ix in
+         let* x = DeBruijn.Env.lookup ix in
          return @@ Raw.Var x
       | Lam b ->
          let* b = bound1 b in
