@@ -173,7 +173,7 @@ module Quote = struct
          let$ x2 = fresh ~user (Eval.clo1 motive x1) in
          normal_clo2 ~ty:(Eval.clo1 motive (Suc x1)) case_succ x1 x2
        in
-       let* motive = typ_clo1 motive x1 in
+       let* motive = normal_clo1 ~ty:Type motive x1 in
        return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_suc ()
 
   and normal_eta ~ty ~tm =
@@ -218,7 +218,7 @@ module Quote = struct
        let user = clo1_name f in
        let* f =
          let$ x_a = fresh ~user a in
-         typ_clo1 f x_a
+         normal_clo1 ~ty:Type f x_a
        in
        let* a = typ a in
        return @@ C.Build.forall a f
@@ -235,14 +235,16 @@ module Quote = struct
     | Lam _ ->
        Error.internal "ill-typed type quotation: lam _"
 
-  and typ_clo1 (C1 (_, Bound1 { user; _ }) as clo) x =
-    let* body = typ (Eval.clo1 clo x) in
+  and normal_clo1 ~ty (C1 (_, Bound1 { user; _ }) as clo) x =
+    let* body = normal_ ~ty ~tm:(Eval.clo1 clo x) in
     return @@ C.Bound1 { body; user; }
 
   and normal_clo2 ~ty (C2 (_, Bound2 { user1; user2; _ }) as clo) x1 x2 =
     let* body = normal_ ~ty ~tm:(Eval.clo2 clo x1 x2) in
     return @@ C.Bound2 { body; user1; user2; }
 
+  (* This function avoids calling typ directly, since typ is type-directed and
+     we might be acting on an ill-typed value here. *)
   and value = function
     | Reflect { tm; _ } ->
        neutral tm
@@ -273,9 +275,11 @@ module Quote = struct
        let user = clo1_name f in
        let* f =
          let$ x_a = fresh ~user a in
-         typ_clo1 f x_a
+         (* We avoid calling typ_clo1 since this value might be ill-typed and we
+            do not want the subsequent call to [quote_typ] to fail.*)
+         normal_clo1 ~ty:Type f x_a
        in
-       let* a = typ a in
+       let* a = normal_ ~ty:Type ~tm:a in
        return @@ C.Build.forall a f
 
     | Type ->
@@ -324,4 +328,17 @@ module PPrint = struct
     in
     Core.ToRaw.term tm (DeBruijn.Env.map (fun { user; _ } -> user) env)
     |> Raw.PPrint.term
+
+  let entry { def; ty; user; } env doc =
+    let open PPrint in
+    let ty = Option.fold ~none:(!^ "?") ~some:(fun v -> value v env) ty in
+    group @@
+      prefix 2 1
+        (prefix 2 1 (!^ user ^^ colon) (ty ^^ space ^^ equals))
+        (value def env)
+      ^^ (if DeBruijn.Env.width env > 0 then semi ^^ space else empty)
+      ^^ doc
+
+  let env env =
+    DeBruijn.Env.fold_cons entry env PPrint.empty
 end

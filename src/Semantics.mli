@@ -36,6 +36,7 @@ val close2 : Core.bound2 -> env -> clo2
 
 module PPrint : sig
   val value : value -> env -> PPrint.document
+  val env : env -> PPrint.document
 end
 
 (** {2 Evaluation, from syntax to semantics} *)

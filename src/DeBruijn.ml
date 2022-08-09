@@ -58,6 +58,14 @@ module Env = struct
   let fold f { c; _ } acc =
     List.fold_right f c acc
 
+  let rec fold_cons f env acc =
+    match env.c with
+    | [] ->
+       acc
+    | entry :: c ->
+       let env' = { c; w = env.w - 1; } in
+       f entry env @@ fold_cons f env' acc
+
   let map f { c; w; } =
     { c = List.map f c; w; }
 

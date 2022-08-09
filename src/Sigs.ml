@@ -34,6 +34,7 @@ end
 
 module Formatter = struct
   type 'a t = Format.formatter -> 'a -> unit
+  let pp_if enabled pp fmt x = if enabled then pp fmt x else ()
 end
 
 module Unicode = struct

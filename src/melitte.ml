@@ -12,16 +12,88 @@ let parse inp =
   close_in ic;
   raw
 
+let pass banner pp f input =
+  let output = f input in
+  if !Options.verbose
+  then
+    begin
+      Printf.printf "{- %s -}\n" banner;
+      ExtPrint.to_out (pp output);
+      print_newline (); flush stdout;
+    end;
+  output
+
+let pp_env fmt env =
+  Format.fprintf fmt " in [@[%a@]]"
+    (ExtPrint.to_fmt Semantics.PPrint.env) env
+
+let on_check_pre env ~expected tm =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a? @[%a@]@[%a@]@]@."
+      (ExtPrint.to_fmt Raw.PPrint.term) tm
+      UnicodeSigil.pp UnicodeSigil.dlarrow
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
+      (Sigs.Formatter.pp_if !Options.verbose pp_env) env
+
+let on_infer_pre env tm =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a?@[%a@]@]@."
+      (ExtPrint.to_fmt Raw.PPrint.term) tm
+      UnicodeSigil.pp UnicodeSigil.drarrow
+      (Sigs.Formatter.pp_if !Options.verbose pp_env) env
+
+let on_conversion_pre env ~expected ~actual _loc =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a? @[%a@]@]@."
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
+      UnicodeSigil.pp UnicodeSigil.tripleq
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) actual
+
+let on_check_post env ~expected tm =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a%a @[%a@]@]@."
+      (ExtPrint.to_fmt Raw.PPrint.term) tm
+      UnicodeSigil.pp UnicodeSigil.dlarrow
+      UnicodeSigil.pp UnicodeSigil.checkmark
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
+
+let on_infer_post env tm ~actual =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a%a @[%a@]@]@."
+      (ExtPrint.to_fmt Raw.PPrint.term) tm
+      UnicodeSigil.pp UnicodeSigil.drarrow
+      UnicodeSigil.pp UnicodeSigil.checkmark
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) actual
+
+let on_conversion_post env ~expected ~actual _loc =
+  if !Options.debug
+  then
+    Format.eprintf "@[<hv 2>@[%a@]@ %a%a @[%a@]@]@."
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
+      UnicodeSigil.pp UnicodeSigil.tripleq
+      UnicodeSigil.pp UnicodeSigil.checkmark
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) actual
+
 let process inp =
   try
-    let raw = parse inp in
-    Printf.printf "{- Raw source code -}\n";
-    ExtPrint.to_out (Raw.PPrint.file raw);
-    print_newline (); flush stdout;
-    let syn = Elaborator.(M.run @@ check raw) in
-    Printf.printf "{- Elaborated source code -}\n";
-    ExtPrint.to_out (Core.PPrint.file syn);
-    print_newline (); flush stdout;
+    pass "Raw code" Raw.PPrint.file parse inp
+    |> pass
+         "Elaborated code"
+         Core.PPrint.file
+         Elaborator.(fun x -> run
+                                ~on_check_pre
+                                ~on_infer_pre
+                                ~on_conversion_pre
+                                ~on_check_post
+                                ~on_infer_post
+                                ~on_conversion_post
+                              @@ check x)
+    |> ignore
   with Error.Error err ->
     Format.eprintf "%a@." Error.print err;
     exit 1

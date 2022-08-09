@@ -12,14 +12,24 @@ val string : t -> string
 
 val doc : t -> PPrint.document
 
+val pp : Format.formatter -> t -> unit
+
 val lambda : t
 
 val forall : t
 
-val sarrow : t
+val srarrow : t
 
-val darrow : t
+val drarrow : t
+
+val slarrow : t
+
+val dlarrow : t
 
 val typ : t
 
 val nat : t
+
+val tripleq : t
+
+val checkmark : t

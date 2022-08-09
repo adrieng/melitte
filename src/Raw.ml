@@ -142,7 +142,7 @@ module PPrint = struct
        let patterns, body = lam t in
        bindN
          U.(doc lambda)
-         U.(doc darrow)
+         U.(doc drarrow)
          patterns
          (term_desc body)
 
@@ -160,7 +160,7 @@ module PPrint = struct
                                body; }) ->
             parens (hyp pat a) ^/^ print_forall body.Position.value
          | t ->
-            U.(doc sarrow) ^/^ typ_desc t
+            U.(doc srarrow) ^/^ typ_desc t
        in
        group (U.(doc forall) ^/^ print_forall t)
 
@@ -168,20 +168,20 @@ module PPrint = struct
        let rec print_fun = function
          | Forall (a, Bound1 { pat = { Position.value = PWildcard; _ };
                                body; }) ->
-            typ a ^^ space ^^ U.(doc sarrow) ^/^ print_fun body.Position.value
+            typ a ^^ space ^^ U.(doc srarrow) ^/^ print_fun body.Position.value
          | t ->
             typ_desc t
        in
        group (print_fun t)
 
     | Natelim { scrut; motive; case_zero; case_suc; } ->
-       let m = bind1 (!^ " with") U.(doc darrow) motive in
+       let m = bind1 (!^ " with") U.(doc drarrow) motive in
        prefix 2 1
          (group (!^ "elim" ^/^ term scrut ^^ m))
          (braces @@ separate (break 1 ^^ bar)
                       [
-                        bind0 (!^ " zero") U.(doc darrow) case_zero;
-                        bind2 (!^ " suc") U.(doc darrow) case_suc;
+                        bind0 (!^ " zero") U.(doc drarrow) case_zero;
+                        bind2 (!^ " suc") U.(doc drarrow) case_suc;
                       ] ^^ break 1)
 
   and simple_term_desc = function

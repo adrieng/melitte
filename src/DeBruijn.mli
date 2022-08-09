@@ -52,8 +52,13 @@ module Env : sig
   (** See {! List.fold_right}. *)
   val fold : ('a -> 'b -> 'b) -> 'a t -> 'b -> 'b
 
+  (** A variant of {! fold} providing easy access to the environment following
+      each extension. *)
+  val fold_cons : ('a -> 'a t -> 'b -> 'b) -> 'a t -> 'b -> 'b
+
   (** See {! List.to_seq}. *)
   val to_seq : 'a t -> 'a Seq.t
 
   val sexp_of_t : ('a -> Sexplib.Sexp.t) -> 'a t -> Sexplib.Sexp.t
 end
+
