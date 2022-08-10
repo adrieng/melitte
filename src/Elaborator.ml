@@ -234,8 +234,8 @@ and infer : R.term -> (C.term * S.ty) M.t =
        begin match mty with
        | Forall (a, f) ->
           let* n = check ~expected:a n in
-          let* msem = eval m in
-          return @@ (C.Build.app m n, S.Eval.clo1 f msem)
+          let* nsem = eval n in
+          return @@ (C.Build.app m n, S.Eval.clo1 f nsem)
 
        | actual ->
           unexpected_head_constr ~expected:`Forall ~actual m.C.t_loc
