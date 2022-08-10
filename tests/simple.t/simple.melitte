@@ -6,16 +6,17 @@ val const : ℕ → ℕ = λ x ⇒ zero
 
 val id : ∀ (A : 𝕌) → A → A = λ A x ⇒ x
 
-val iter : ∀ (A : 𝕌) (f : A → A) → ℕ → A → A =
-  λ A f n z ⇒ elim n with _ ⇒ A { zero ⇒ z | suc _, r ⇒ f r }
+val iter : ∀ (A : 𝕌) (f : A → A) → A → ℕ → A =
+  λ A f z n ⇒ elim n with _ ⇒ A { zero ⇒ z | suc _, r ⇒ f r }
 
-val add : ℕ → ℕ → ℕ =
-  λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ m | suc _, r ⇒ suc r }
+val add : ℕ → ℕ → ℕ = iter ℕ (λ n ⇒ suc n)
 
-val mul : ℕ → ℕ → ℕ = iter ℕ add
+val mul : ℕ → ℕ → ℕ = λ n ⇒ iter ℕ (add n) zero
 
-val exp : ℕ → ℕ → ℕ = iter ℕ mul
+val exp : ℕ → ℕ → ℕ = λ n ⇒ iter ℕ (mul n) 1
 
+{-
 val exp_n : ℕ → 𝕌 =
   let exp_once : 𝕌 → 𝕌 = λ t ⇒ ℕ → t in
-  iter (ℕ → 𝕌) exp_once n ℕ
+  iter 𝕌 exp_once n ℕ
+-}
