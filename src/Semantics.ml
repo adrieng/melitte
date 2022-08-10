@@ -331,12 +331,15 @@ module PPrint = struct
 
   let entry { def; ty; user; } env doc =
     let open PPrint in
-    let ty = Option.fold ~none:(!^ "?") ~some:(fun v -> value v env) ty in
+    let ty = match ty with
+      | None -> empty
+      | Some ty -> group @@ colon ^/^ value ty env ^^ space
+    in
     group @@
       prefix 2 1
-        (prefix 2 1 (!^ user ^^ colon) (ty ^^ space ^^ equals))
+        (prefix 2 1 (!^ user) (ty ^^ equals))
         (value def env)
-      ^^ (if DeBruijn.Env.width env > 0 then semi ^^ space else empty)
+      ^^ (if DeBruijn.Env.width env > 1 then semi ^^ space else empty)
       ^^ doc
 
   let env env =
