@@ -341,4 +341,18 @@ module PPrint = struct
 
   let env env =
     DeBruijn.Env.fold_cons entry env PPrint.empty
+
+  let clo1 (C1 (cenv, bound1)) =
+    let doc =
+      Core.ToRaw.bound1 bound1 (E.map (fun { user; _ } -> user) cenv)
+      |> Raw.PPrint.bound1
+    in
+    PPrint.(doc ^^ braces (env cenv))
+
+  let clo2 (C2 (cenv, bound2)) =
+    let doc =
+      Core.ToRaw.bound2 bound2 (E.map (fun { user; _ } -> user) cenv)
+      |> Raw.PPrint.bound2
+    in
+    PPrint.(doc ^^ braces (env cenv))
 end

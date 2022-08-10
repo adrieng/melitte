@@ -110,6 +110,8 @@ module PPrint : sig
   val pattern : pattern -> PPrint.document
   val term_desc : term_desc -> PPrint.document
   val term : term -> PPrint.document
+  val bound1 : bound1 -> PPrint.document
+  val bound2 : bound2 -> PPrint.document
   val phrase : phrase -> PPrint.document
   val file : t -> PPrint.document
 end

@@ -252,6 +252,12 @@ module PPrint = struct
   and bind2 kw sep (Bound2 { pat1; pat2; body; }) =
     bindN kw sep [pattern pat1 ^^ comma; pattern pat2] (term body)
 
+  and bound1 (Bound1 { pat; body; }) =
+    pattern pat ^^ dot ^^ term body
+
+  and bound2 (Bound2 { pat1; pat2; body; }) =
+    parens (group (pattern pat1 ^^ comma ^/^ pattern pat2)) ^^ dot ^^ term body
+
   and hyp (p : pattern) ty =
     group (pattern p ^^ space ^^ colon ^/^ typ ty)
 
