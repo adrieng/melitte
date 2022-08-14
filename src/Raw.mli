@@ -35,8 +35,8 @@ type term_desc =
                  case_zero : term;
                  case_suc : bound2; }
   (** Dependent elimination form for natural numbers. *)
-  | Type
-  (** Universe of small types. *)
+  | Type of int
+  (** Universe hierarchy. *)
 
 and term = term_desc Position.located
 
@@ -94,7 +94,7 @@ module Build : sig
                 case_zero:term ->
                 case_suc:bound2 ->
                 unit -> term
-  val typ : ?loc:Position.t -> unit -> term
+  val typ : ?loc:Position.t -> level:int -> unit -> term
   val bound1 : pattern -> term -> bound1
   val bound2 : pattern -> pattern -> term -> bound2
   val val_ : ?loc:Position.t ->

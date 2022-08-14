@@ -4,7 +4,7 @@ type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
   | Forall of value * clo1
-  | Type
+  | Type of UniverseLevel.t
   | Nat
   | Zero
   | Suc of value
@@ -28,11 +28,15 @@ and env = entry DeBruijn.Env.t
 
 type ty = value
 
-(** {2 Utility functions} *)
+(** {2 Utility values} *)
 
 val close1 : Core.bound1 -> env -> clo1
 
 val close2 : Core.bound2 -> env -> clo2
+
+(** [limtype] is the top of our universe hierarchy. It does not exist in the
+    syntax but allows for a simpler formulation of the elaboration algorithm. *)
+val limtype : value
 
 module PPrint : sig
   val value : value -> env -> PPrint.document
@@ -89,6 +93,6 @@ end
 (** {2 Convertibility and normalization} *)
 
 module Conv : sig
-  val ty : value -> value -> bool Quote.M.t
+  val ty : lo:value -> hi:value -> bool Quote.M.t
   val normalize : ty:ty -> tm:Core.term -> Core.term Eval.M.t
 end

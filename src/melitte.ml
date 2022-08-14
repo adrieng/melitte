@@ -47,10 +47,9 @@ let on_infer_pre env tm =
 let on_conversion_pre env ~expected ~actual _loc =
   if !Options.debug
   then
-    Format.eprintf "@[<hv 2>@[%a@]@ %a? @[%a@]@]@."
-      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
-      UnicodeSigil.pp UnicodeSigil.tripleq
+    Format.eprintf "@[<hv 2>@[%a@]@ <:? @[%a@]@]@."
       (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) actual
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
 
 let on_check_post env ~expected tm =
   if !Options.debug
@@ -73,11 +72,10 @@ let on_infer_post env tm ~actual =
 let on_conversion_post env ~expected ~actual _loc =
   if !Options.debug
   then
-    Format.eprintf "@[<hv 2>@[%a@]@ %a%a @[%a@]@]@."
-      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
-      UnicodeSigil.pp UnicodeSigil.tripleq
-      UnicodeSigil.pp UnicodeSigil.checkmark
+    Format.eprintf "@[<hv 2>@[%a@]@ <:%a @[%a@]@]@."
       (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) actual
+      UnicodeSigil.pp UnicodeSigil.checkmark
+      (ExtPrint.to_fmt (fun v -> Semantics.PPrint.value v env)) expected
 
 let process inp =
   try

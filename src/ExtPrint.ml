@@ -2,6 +2,8 @@ let ribbon = 1.0
 
 let width = 80
 
+let int i = PPrint.string @@ string_of_int i
+
 let to_out ?(out = stdout) d =
   PPrint.ToChannel.pretty ribbon width out d
 

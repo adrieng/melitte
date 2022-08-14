@@ -15,7 +15,7 @@ type term_desc =
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
-  | Type
+  | Type of int
 
 and term =
   {
@@ -78,7 +78,7 @@ module Build : sig
                 case_zero:term ->
                 case_suc:bound2 ->
                 unit -> term
-  val typ : ?loc:Position.t -> unit -> term
+  val typ : ?loc:Position.t -> level:int -> unit -> term
   val val_ : ?loc:Position.t ->
              ?user:Name.t ->
              ty:ty ->

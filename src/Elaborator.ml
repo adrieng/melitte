@@ -1,6 +1,7 @@
 module R = Raw
 module C = Core
 module S = Semantics
+module L = UniverseLevel
 
 module Env = DeBruijn.Env
 
@@ -16,7 +17,6 @@ let bound2_name_2 R.(Bound2 { pat2; _ }) =
   R.name_of_pattern pat2
 
 (* {2 Type checking} *)
-
 
 type state =
   {
@@ -114,7 +114,7 @@ let eval tm = liftE @@ S.Eval.term tm
 
 let check_conv ~expected ~actual loc =
   let* () = on_conversion_pre ~expected ~actual loc in
-  let* conv = liftE @@ S.Quote.lift @@ S.Conv.ty expected actual in
+  let* conv = liftE @@ S.Quote.lift @@ S.Conv.ty ~lo:actual ~hi:expected in
   if conv
   then on_conversion_post ~expected ~actual loc
   else incompatible_types ~expected ~actual loc
@@ -135,19 +135,18 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      return @@ C.Build.let_ ~loc ~def ~ty ~body ()
 
   | Forall (a, f) ->
-
      begin match expected with
-     | S.Type ->
-        let* a = check_is_ty a in
+     | S.Type _ ->
+        let* a = check ~expected a in
         let* f =
           let* asem = eval a in
           let$ _ = fresh ~ty:asem (bound1_name f) in
-          check_bound1_is_ty f
+          check_bound1 ~expected f
         in
         return @@ C.Build.forall ~loc a f
 
-     | actual ->        unexpected_head_constr ~expected:`Univ ~actual loc
-
+     | actual ->
+        unexpected_head_constr ~expected:`Univ ~actual loc
      end
 
   | Lam body ->
@@ -163,18 +162,18 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
 
   | Nat ->
      begin match expected with
-     | Type ->
+     | Type _ ->
         return @@ C.Build.nat ~loc ()
 
      | _ ->
         unexpected_type ~expected loc
      end
 
-  | Type ->
+  | Type l_actual ->
      begin match expected with
-     | Type ->
-        if !Options.type_in_type
-        then return @@ C.Build.typ ~loc ()
+     | Type l_expected ->
+        if !Options.type_in_type || L.(fin l_actual <= l_expected)
+        then return @@ C.Build.typ ~loc ~level:l_actual ()
         else Error.universe_inconsistency loc
 
      | _ ->
@@ -188,37 +187,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      return tm
 
 and check_is_ty : R.ty -> C.ty M.t =
-  fun (Position.{ value = tm; position = loc; } as r) ->
-  match tm with
-  | Forall (a, f) ->
-     let* a = check_is_ty a in
-     let* f =
-       let* asem = eval a in
-       let$ _ = fresh ~ty:asem @@ bound1_name f in
-       check_bound1_is_ty f
-     in
-     return @@ C.Build.forall ~loc a f
-
-  | Nat ->
-     return @@ C.Build.nat ~loc ()
-
-  | Type ->
-     return @@ C.Build.typ ~loc ()
-
-  | Lam _ ->
-     check ~expected:Type r
-
-  | Let _ ->
-     assert false               (* TODO *)
-
-  | Var _ | App _ | Natelim _ | Zero | Suc _ ->
-     let* tm, ty = infer r in
-     begin match ty with
-     | Type ->
-        return tm
-     | actual ->
-        unexpected_head_constr ~expected:`Univ ~actual loc
-     end
+  fun tm -> check ~expected:S.limtype tm
 
 and infer : R.term -> (C.term * S.ty) M.t =
   fun (Position.{ value = r; position = loc; } as tm) ->
@@ -267,7 +236,11 @@ and infer : R.term -> (C.term * S.ty) M.t =
        in
        return @@ (C.Build.natelim ~scrut ~motive ~case_zero ~case_suc (), resty)
 
-    | Let _ | Forall _ | Lam _ | Nat | Type ->
+    | Type i ->
+       let level = i + 1 in
+       return @@ (C.Build.typ ~level (), S.Type L.(fin level))
+
+    | Let _ | Forall _ | Lam _ | Nat ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in

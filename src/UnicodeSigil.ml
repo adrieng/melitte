@@ -53,3 +53,9 @@ let nat = make [| 8469 |] "Nat"
 let tripleq = make [| 0x2261 |] "=="
 
 let checkmark = make [| 0x2713 |] "ok"
+
+let langle = make [| 0x27E8 |] "<"
+
+let rangle = make [| 0x27E9 |] ">"
+
+let omega = make [| 0x03C9 |] "omega"

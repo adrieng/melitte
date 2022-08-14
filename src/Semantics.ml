@@ -1,11 +1,14 @@
+open Sexplib.Conv
+
 module C = Core
 module E = DeBruijn.Env
+module L = UniverseLevel
 
 type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
   | Forall of value * clo1
-  | Type
+  | Type of L.t
   | Nat
   | Zero
   | Suc of value
@@ -29,7 +32,7 @@ and entry =
     user : Name.t;
   }
 
-and env = entry DeBruijn.Env.t
+and env = entry DeBruijn.Env.t [@@deriving sexp_of]
 
 type ty = value
 
@@ -41,6 +44,8 @@ let clo1_name (C1 (_, C.Bound1 { user; _ })) =
 let close1 b1 env = C1 (env, b1)
 
 let close2 b2 env = C2 (env, b2)
+
+let limtype = Type UniverseLevel.inf
 
 module Eval = struct
   module M = Monad.Reader(struct type t = env end)
@@ -79,8 +84,8 @@ module Eval = struct
        let* body = close1 body in
        return @@ clo1 body def
 
-    | C.Type ->
-       return Type
+    | C.Type l ->
+       return @@ Type (UniverseLevel.fin l)
 
     | C.Nat ->
        return Nat
@@ -173,21 +178,38 @@ module Quote = struct
          let$ x2 = fresh ~user (Eval.clo1 motive x1) in
          normal_clo2 ~ty:(Eval.clo1 motive (Suc x1)) case_succ x1 x2
        in
-       let* motive = normal_clo1 ~ty:Type motive x1 in
+       let* motive = normal_clo1 ~ty:(Type L.inf) motive x1 in
        return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_suc ()
 
   and normal_eta ~ty ~tm =
     match ty, tm with
-    | _, Reflect { tm; _ } ->
+    | Reflect _, Reflect { tm; _ } ->
        neutral tm
 
-    | Type, _ ->
-       typ tm
+    | Type _, Type Inf ->
+       Error.internal "limit universe quotation"
 
-    | Forall (a, f), v ->
+    | Type l1, Type (Fin level) ->
+       if not !Options.type_in_type && L.(l1 <= fin level)
+       then Error.internal "ill-typed normal quotation: universe level"
+       else return @@ C.Build.typ ~level ()
+
+    | Type _, Nat ->
+       return @@ C.Build.nat ()
+
+    | Type _, Forall (a, f) ->
+       let user = clo1_name f in
+       let* a' = typ a in
+       let* f =
+         let$ x_a = fresh ~user a in
+         normal_clo1 ~ty f x_a
+       in
+       return @@ C.Build.forall a' f
+
+    | Forall (a, f), _ ->
        let user = clo1_name f in
        let$ x = fresh ~user a in
-       let* body = normal_ ~ty:(Eval.clo1 f x) ~tm:(Eval.app v x) in
+       let* body = normal_ ~ty:(Eval.clo1 f x) ~tm:(Eval.app tm x) in
        return @@ C.Build.lam (Bound1 { body; user = None; })
 
     | Nat, Zero ->
@@ -207,33 +229,8 @@ module Quote = struct
   and normal (Reify { ty; tm; }) =
     normal_ ~ty ~tm
 
-  and typ = function
-    | Type ->
-       return @@ C.Build.typ ()
-
-    | Nat ->
-       return @@ C.Build.nat ()
-
-    | Forall (a, f) ->
-       let user = clo1_name f in
-       let* f =
-         let$ x_a = fresh ~user a in
-         normal_clo1 ~ty:Type f x_a
-       in
-       let* a = typ a in
-       return @@ C.Build.forall a f
-
-    | Reflect { tm; _ } ->
-       neutral tm
-
-    | Zero ->
-       Error.internal "ill-typed type quotation: zero"
-
-    | Suc _ ->
-       Error.internal "ill-typed type quotation: suc _"
-
-    | Lam _ ->
-       Error.internal "ill-typed type quotation: lam _"
+  and typ tm =
+    normal_ ~ty:limtype ~tm
 
   and normal_clo1 ~ty (C1 (_, Bound1 { user; _ }) as clo) x =
     let* body = normal_ ~ty ~tm:(Eval.clo1 clo x) in
@@ -251,10 +248,9 @@ module Quote = struct
 
     | Lam (C1 (env, body)) ->
        (* This could be written in direct style, but for the sake of consistency
-          with the surrounding code I write in in monadic style. Having a
-          generic monadic fold in DeBruijn.Env would remove the need for the
-          explicit recurion here, but I believe that this is this is too
-          unpleasant to write in current OCaml. *)
+          uses monadic style. Having a generic monadic fold in DeBruijn.Env
+          would remove the need for the explicit recurion here, but I believe
+          that this is this is too unpleasant to write in current OCaml. *)
        let rec wrap_env envseq =
          match envseq () with
          | Seq.Nil -> return @@ C.Build.lam body
@@ -277,13 +273,17 @@ module Quote = struct
          let$ x_a = fresh ~user a in
          (* We avoid calling typ_clo1 since this value might be ill-typed and we
             do not want the subsequent call to [quote_typ] to fail.*)
-         normal_clo1 ~ty:Type f x_a
+         normal_clo1 ~ty:limtype f x_a
        in
-       let* a = normal_ ~ty:Type ~tm:a in
+       let* a = normal_ ~ty:limtype ~tm:a in
        return @@ C.Build.forall a f
 
-    | Type ->
-       return @@ C.Build.typ ()
+    | Type (Fin level) ->
+       return @@ C.Build.typ ~level ()
+
+    | Type Inf ->
+       return @@ C.Build.typ ~level:max_int ()
+       (* Error.internal "limit universe quotation" *)
 
     | Nat ->
        return @@ C.Build.nat ()
@@ -297,22 +297,118 @@ module Quote = struct
 end
 
 module Conv = struct
-  let is_not_typ = function
-    | Lam _ | Zero | Suc _ ->
-       true
-    | Reflect _ | Forall _ | Type | Nat ->
-       false
+  open Monad.Notation(Quote.M)
 
-  (* TODO implement smarter binary algorithm *)
+  (* TODO factor out somehow *)
+  let (let$) = Quote.(let$)
 
-  let ty v1 v2 =
-    let open Monad.Notation(Quote.M) in
-    if is_not_typ v1 || is_not_typ v2
-    then return false
-    else
-      let* tm1 = Quote.typ v1 in
-      let* tm2 = Quote.typ v2 in
-      return @@ Core.equal_term tm1 tm2
+  let (&&&) x y = let* b = x in if b then y else return false
+
+  let level ~allow_subtype ~lo ~hi =
+    let open UniverseLevel in
+    return @@ if allow_subtype then lo <= hi else lo = hi
+
+  let rec normal_ ~allow_subtype ~lo ~lo_ty ~hi ~hi_ty =
+    match lo_ty, lo, hi_ty, hi with
+    | _, Reflect { tm = lo; _ },
+      _, Reflect { tm = hi; _ } ->
+       neutral ~allow_subtype ~lo ~hi
+
+    | Type _, Nat,
+      Type _, Nat ->
+       return true
+
+    | Type _, Type l_lo,
+      Type _, Type l_hi ->
+       level ~allow_subtype ~lo:l_lo ~hi:l_hi
+
+    | Type _, Forall (lo_dom, lo_cod),
+      Type _, Forall (hi_dom, hi_cod) ->
+       normal_
+         ~allow_subtype ~lo_ty:limtype ~lo:hi_dom ~hi_ty:limtype ~hi:lo_dom
+       &&&
+         let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
+         normal_ ~allow_subtype
+           ~lo_ty
+           ~lo:(Eval.clo1 lo_cod x)
+           ~hi_ty
+           ~hi:(Eval.clo1 hi_cod x)
+
+    | Nat, Zero,
+      Nat, Zero ->
+       return true
+
+    | Nat, Suc lo,
+      Nat, Suc hi ->
+       normal_ ~allow_subtype ~lo_ty ~lo ~hi_ty ~hi
+
+    | Forall (lo_dom, lo_cod), _,
+      Forall (hi_dom, hi_cod), _ ->
+       normal_
+         ~allow_subtype ~lo_ty:limtype ~lo:hi_dom ~hi_ty:limtype ~hi:lo_dom
+       &&&
+         let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
+         normal_
+           ~allow_subtype
+           ~lo_ty:(Eval.clo1 lo_cod x)
+           ~lo:(Eval.app lo x)
+           ~hi_ty:(Eval.clo1 hi_cod x)
+           ~hi:(Eval.app hi x)
+
+    | _ ->
+       return false
+
+  and normal ~allow_subtype ~lo ~hi =
+    let Reify { tm = lo; ty = lo_ty; } = lo in
+    let Reify { tm = hi; ty = hi_ty; } = hi in
+    normal_ ~allow_subtype ~lo ~lo_ty ~hi ~hi_ty
+
+  and neutral ~allow_subtype ~lo ~hi =
+    match lo, hi with
+    | Var lv1,
+      Var lv2 ->
+       return @@ DeBruijn.Lv.equal lv1 lv2
+
+    | App (lo_ne, lo_nf),
+      App (hi_ne, hi_nf) ->
+       neutral ~allow_subtype ~lo:lo_ne ~hi:hi_ne
+       &&& normal ~allow_subtype ~lo:lo_nf ~hi:hi_nf
+
+    | Natelim (lo_scrut, lo_motive, lo_case_zero, lo_case_succ),
+      Natelim (hi_scrut, hi_motive, hi_case_zero, hi_case_succ) ->
+       neutral ~allow_subtype ~lo:lo_scrut ~hi:hi_scrut
+       &&& normal_ ~allow_subtype
+             ~lo_ty:(Eval.clo1 lo_motive Zero) ~lo:lo_case_zero
+             ~hi_ty:(Eval.clo1 hi_motive Zero) ~hi:hi_case_zero
+       &&&
+         let$ x1 = Quote.fresh ~user:(clo1_name lo_motive) Nat in
+         normal_clo1 ~allow_subtype ~ty:limtype ~lo:lo_motive ~hi:hi_motive x1
+         &&&
+           let$ x2 =
+             Quote.fresh ~user:(clo1_name lo_motive) (Eval.clo1 lo_motive x1)
+           in
+           normal_clo2
+             ~allow_subtype
+             ~ty:(Eval.clo1 lo_motive (Suc x1))
+             ~lo:lo_case_succ ~hi:hi_case_succ x1 x2
+
+    | _ ->
+       return false
+
+  and normal_clo1 ~allow_subtype ~ty ~lo ~hi arg =
+    normal_
+      ~allow_subtype
+      ~lo_ty:ty ~lo:(Eval.clo1 lo arg)
+      ~hi_ty:ty ~hi:(Eval.clo1 hi arg)
+
+  and normal_clo2 ~allow_subtype ~ty ~lo ~hi arg1 arg2 =
+    normal_
+      ~allow_subtype
+      ~lo_ty:ty ~lo:(Eval.clo2 lo arg1 arg2)
+      ~hi_ty:ty ~hi:(Eval.clo2 hi arg1 arg2)
+
+  let ty ~lo ~hi =
+    normal_ ~allow_subtype:true ~lo_ty:limtype ~lo ~hi_ty:limtype ~hi
 
   let normalize ~ty ~tm =
     let open Monad.Notation(Eval.M) in

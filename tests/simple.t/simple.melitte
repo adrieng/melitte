@@ -1,12 +1,12 @@
-val x : 𝕌 = Nat
+val x : 𝕌 0 = Nat
 
 val three : x = suc suc suc zero
 
 val const : ℕ → ℕ = λ x ⇒ zero
 
-val id : ∀ (A : 𝕌) → A → A = λ A x ⇒ x
+val id : ∀ (A : 𝕌 0) → A → A = λ A x ⇒ x
 
-val iter : ∀ (A : 𝕌) (f : A → A) → A → ℕ → A =
+val iter : ∀ (A : 𝕌 0) (f : A → A) → A → ℕ → A =
   λ A f z n ⇒ elim n with _ ⇒ A { zero ⇒ z | suc _, r ⇒ f r }
 
 val add : ℕ → ℕ → ℕ = iter ℕ (λ n ⇒ suc n)

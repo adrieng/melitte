@@ -13,7 +13,7 @@ type term_desc =
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
-  | Type
+  | Type of int
 
 and term =
   {
@@ -90,8 +90,8 @@ module ToRaw = struct
          let* ty = term ty in
          let* body = bound1 body in
          return @@ Raw.Let { def; ty; body; }
-      | Type ->
-         return Raw.Type
+      | Type l ->
+         return @@ Raw.Type l
       | Nat ->
          return Raw.Nat
       | Zero ->
@@ -170,7 +170,7 @@ module Build = struct
   let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
     desc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
-  let typ ?loc () = desc ?loc Type
+  let typ ?loc ~level () = desc ?loc @@ Type level
 
   let val_ ?(loc = Position.dummy) ?user ~ty ~body () =
     { ph_loc = loc; ph_desc = Val { user; ty; body; } }

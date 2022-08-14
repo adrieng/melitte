@@ -34,6 +34,4 @@ type theory. Here are the ones I looked at:
 
 ## TODO
 
-- add universe levels and factor out type case
-- factor our eval/quote in a Semantics module
 - write a minimalistic Emacs mode with basic interaction facilities

@@ -33,3 +33,9 @@ val nat : t
 val tripleq : t
 
 val checkmark : t
+
+val langle : t
+
+val rangle : t
+
+val omega : t

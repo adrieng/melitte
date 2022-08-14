@@ -31,7 +31,7 @@
 
 very_simple_term_:
 | name = name { B.var ~name }
-| TYPE { B.typ }
+| TYPE level = INT { B.typ ~level }
 | NAT { B.nat }
 | k = INT { B.lit ~k }
 | ZERO { B.zero }

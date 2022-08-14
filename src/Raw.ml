@@ -17,7 +17,7 @@ type term_desc =
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
-  | Type
+  | Type of int
 
 and term = term_desc Position.located
 
@@ -105,8 +105,9 @@ module Build = struct
   let natelim ?(loc = Position.dummy) ~scrut ~motive ~case_zero ~case_suc () =
     Position.with_pos loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
-  let typ ?(loc = Position.dummy) () =
-    Position.with_pos loc Type
+  let typ ?(loc = Position.dummy) ~level () =
+    if level < 0 then invalid_arg "typ";
+    Position.with_pos loc @@ Type level
 
   let val_ ?(loc = Position.dummy) ~name ~ty ~body () =
     Position.with_pos loc @@ Val { name; ty; body; }
@@ -128,7 +129,7 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type | Nat | Zero | Suc _ | App _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _ | App _) as t ->
        group (simple_term_desc t)
 
     | Lam _ as t ->
@@ -185,7 +186,7 @@ module PPrint = struct
                       ] ^^ break 1)
 
   and simple_term_desc = function
-    | (Var _ | Type | Nat | Zero | Suc _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _) as t ->
        very_simple_term_desc t
 
     | App (t, u) ->
@@ -198,8 +199,8 @@ module PPrint = struct
     | Var x ->
        name x
 
-    | Type ->
-       U.(doc typ)
+    | Type l ->
+       U.(doc typ ^^ space ^^ if l = max_int then !^ "top" else ExtPrint.int l)
 
     | Nat ->
        U.(doc nat)
