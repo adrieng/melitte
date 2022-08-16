@@ -308,52 +308,53 @@ module Conv = struct
     let open UniverseLevel in
     return @@ if allow_subtype then lo <= hi else lo = hi
 
-  let rec normal_ ~allow_subtype ~lo ~lo_ty ~hi ~hi_ty =
-    match lo_ty, lo, hi_ty, hi with
-    | _, Reflect { tm = lo; _ },
-      _, Reflect { tm = hi; _ } ->
+  let rec normal_ ~allow_subtype ~ty ~lo ~hi =
+    match ty, lo, hi with
+    | _,
+      Reflect { tm = lo; _ },
+      Reflect { tm = hi; _ } ->
        neutral ~allow_subtype ~lo ~hi
 
-    | Type _, Nat,
-      Type _, Nat ->
+    | Type _,
+      Nat,
+      Nat ->
        return true
 
-    | Type _, Type l_lo,
-      Type _, Type l_hi ->
+    | Type _,
+      Type l_lo,
+      Type l_hi ->
        level ~allow_subtype ~lo:l_lo ~hi:l_hi
 
-    | Type _, Forall (lo_dom, lo_cod),
-      Type _, Forall (hi_dom, hi_cod) ->
-       normal_
-         ~allow_subtype ~lo_ty:limtype ~lo:hi_dom ~hi_ty:limtype ~hi:lo_dom
+    | Type _,
+      Forall (lo_dom, lo_cod),
+      Forall (hi_dom, hi_cod) ->
+       normal_ ~allow_subtype ~ty ~lo:hi_dom ~hi:lo_dom
        &&&
          let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
          normal_ ~allow_subtype
-           ~lo_ty
+           ~ty
            ~lo:(Eval.clo1 lo_cod x)
-           ~hi_ty
            ~hi:(Eval.clo1 hi_cod x)
 
-    | Nat, Zero,
-      Nat, Zero ->
+    | Nat,
+      Zero,
+      Zero ->
        return true
 
-    | Nat, Suc lo,
-      Nat, Suc hi ->
-       normal_ ~allow_subtype ~lo_ty ~lo ~hi_ty ~hi
+    | Nat,
+      Suc lo,
+      Suc hi ->
+       normal_ ~allow_subtype ~ty ~lo ~hi
 
-    | Forall (lo_dom, lo_cod), _,
-      Forall (hi_dom, hi_cod), _ ->
+    | Forall (dom, cod),
+      _,
+      _ ->
+       let$ x = Quote.fresh ~user:(clo1_name cod) dom in
        normal_
-         ~allow_subtype ~lo_ty:limtype ~lo:hi_dom ~hi_ty:limtype ~hi:lo_dom
-       &&&
-         let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
-         normal_
-           ~allow_subtype
-           ~lo_ty:(Eval.clo1 lo_cod x)
-           ~lo:(Eval.app lo x)
-           ~hi_ty:(Eval.clo1 hi_cod x)
-           ~hi:(Eval.app hi x)
+         ~allow_subtype
+         ~ty:(Eval.clo1 cod x)
+         ~lo:(Eval.app lo x)
+         ~hi:(Eval.app hi x)
 
     | _ ->
        return false
@@ -361,7 +362,8 @@ module Conv = struct
   and normal ~allow_subtype ~lo ~hi =
     let Reify { tm = lo; ty = lo_ty; } = lo in
     let Reify { tm = hi; ty = hi_ty; } = hi in
-    normal_ ~allow_subtype ~lo ~lo_ty ~hi ~hi_ty
+    normal_ ~allow_subtype ~ty:limtype ~lo:lo_ty ~hi:hi_ty
+    &&& normal_ ~allow_subtype ~ty:lo ~lo ~hi
 
   and neutral ~allow_subtype ~lo ~hi =
     match lo, hi with
@@ -377,38 +379,34 @@ module Conv = struct
     | Natelim (lo_scrut, lo_motive, lo_case_zero, lo_case_succ),
       Natelim (hi_scrut, hi_motive, hi_case_zero, hi_case_succ) ->
        neutral ~allow_subtype ~lo:lo_scrut ~hi:hi_scrut
+       &&& (let$ x1 = Quote.fresh ~user:(clo1_name lo_motive) Nat in
+            normal_clo1 ~allow_subtype
+              ~ty:limtype ~lo:lo_motive ~hi:hi_motive x1)
        &&& normal_ ~allow_subtype
-             ~lo_ty:(Eval.clo1 lo_motive Zero) ~lo:lo_case_zero
-             ~hi_ty:(Eval.clo1 hi_motive Zero) ~hi:hi_case_zero
+             ~ty:(Eval.clo1 lo_motive Zero) ~lo:lo_case_zero ~hi:hi_case_zero
        &&&
          let$ x1 = Quote.fresh ~user:(clo1_name lo_motive) Nat in
-         normal_clo1 ~allow_subtype ~ty:limtype ~lo:lo_motive ~hi:hi_motive x1
-         &&&
-           let$ x2 =
-             Quote.fresh ~user:(clo1_name lo_motive) (Eval.clo1 lo_motive x1)
-           in
-           normal_clo2
-             ~allow_subtype
-             ~ty:(Eval.clo1 lo_motive (Suc x1))
-             ~lo:lo_case_succ ~hi:hi_case_succ x1 x2
+         let$ x2 =
+           Quote.fresh ~user:(clo1_name lo_motive) (Eval.clo1 lo_motive x1)
+         in
+         normal_clo2
+           ~allow_subtype
+           ~ty:(Eval.clo1 lo_motive (Suc x1))
+           ~lo:lo_case_succ ~hi:hi_case_succ x1 x2
 
     | _ ->
        return false
 
   and normal_clo1 ~allow_subtype ~ty ~lo ~hi arg =
-    normal_
-      ~allow_subtype
-      ~lo_ty:ty ~lo:(Eval.clo1 lo arg)
-      ~hi_ty:ty ~hi:(Eval.clo1 hi arg)
+    normal_ ~allow_subtype ~ty ~lo:(Eval.clo1 lo arg) ~hi:(Eval.clo1 hi arg)
 
   and normal_clo2 ~allow_subtype ~ty ~lo ~hi arg1 arg2 =
-    normal_
-      ~allow_subtype
-      ~lo_ty:ty ~lo:(Eval.clo2 lo arg1 arg2)
-      ~hi_ty:ty ~hi:(Eval.clo2 hi arg1 arg2)
+    normal_ ~allow_subtype ~ty
+      ~lo:(Eval.clo2 lo arg1 arg2)
+      ~hi:(Eval.clo2 hi arg1 arg2)
 
   let ty ~lo ~hi =
-    normal_ ~allow_subtype:true ~lo_ty:limtype ~lo ~hi_ty:limtype ~hi
+    normal_ ~allow_subtype:true ~ty:limtype ~lo ~hi
 
   let normalize ~ty ~tm =
     let open Monad.Notation(Eval.M) in
