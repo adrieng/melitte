@@ -269,12 +269,7 @@ module Quote = struct
 
     | Forall (a, f) ->
        let user = clo1_name f in
-       let* f =
-         let$ x_a = fresh ~user a in
-         (* We avoid calling typ_clo1 since this value might be ill-typed and we
-            do not want the subsequent call to [quote_typ] to fail.*)
-         normal_clo1 ~ty:limtype f x_a
-       in
+       let* f = let$ x_a = fresh ~user a in normal_clo1 ~ty:limtype f x_a in
        let* a = normal_ ~ty:limtype ~tm:a in
        return @@ C.Build.forall a f
 
