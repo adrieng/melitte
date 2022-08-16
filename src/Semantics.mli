@@ -19,9 +19,9 @@ and clo2 = C2 of env * Core.bound2
 
 and entry =
   {
-    def : value;
-    ty : value option;
-    user : Name.t;
+    def : value;        (** Not used during quotation. *)
+    ty : value option;  (** Only used during type-checking. *)
+    user : Name.t;      (** Only used during elaboration *)
   }
 
 and env = entry DeBruijn.Env.t
