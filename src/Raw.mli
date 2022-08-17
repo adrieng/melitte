@@ -18,7 +18,7 @@ type term_desc =
              ty : ty;
              body : bound1; }
   (** Let statement, annotated with its type. *)
-  | Forall of ty * bound1
+  | Pi of ty * bound1
   (** Dependent function type *)
   | Lam of bound1
   (** Anonymous (dependent) function *)
@@ -73,8 +73,8 @@ module Build : sig
   val pwildcard : ?loc:Position.t -> unit -> pattern
   val var : ?loc:Position.t -> name:Name.t -> unit -> term
   val let_ : ?loc:Position.t -> def:term -> ty:ty -> body:bound1 -> unit -> term
-  val forall : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
-  val forall_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+  val pi : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
+  val pi_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
                  unit -> ty
   val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
   val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term

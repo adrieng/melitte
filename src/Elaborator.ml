@@ -134,7 +134,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      in
      return @@ C.Build.let_ ~loc ~def ~ty ~body ()
 
-  | Forall (a, f) ->
+  | Pi (a, f) ->
      begin match expected with
      | S.Type _ ->
         let* a = check ~expected a in
@@ -143,7 +143,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
           let$ _ = fresh ~ty:asem (bound1_name f) in
           check_bound1 ~expected f
         in
-        return @@ C.Build.forall ~loc a f
+        return @@ C.Build.pi ~loc a f
 
      | actual ->
         unexpected_head_constr ~expected:`Univ ~actual loc
@@ -151,7 +151,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
 
   | Lam body ->
      begin match expected with
-     | Forall (a, f) ->
+     | Pi (a, f) ->
         let$ x = fresh ~ty:a @@ bound1_name body in
         let* body = check_bound1 ~expected:(S.Eval.clo1 f x) body in
         return @@ C.Build.lam ~loc body
@@ -201,13 +201,13 @@ and infer : R.term -> (C.term * S.ty) M.t =
     | App (m, n) ->
        let* m, mty = infer m in
        begin match mty with
-       | Forall (a, f) ->
+       | Pi (a, f) ->
           let* n = check ~expected:a n in
           let* nsem = eval n in
           return @@ (C.Build.app m n, S.Eval.clo1 f nsem)
 
        | actual ->
-          unexpected_head_constr ~expected:`Forall ~actual m.C.t_loc
+          unexpected_head_constr ~expected:`Pi ~actual m.C.t_loc
        end
 
     | R.Zero ->
@@ -240,7 +240,7 @@ and infer : R.term -> (C.term * S.ty) M.t =
        let level = i + 1 in
        return @@ (C.Build.typ ~level (), S.Type L.(fin level))
 
-    | Let _ | Forall _ | Lam _ | Nat ->
+    | Let _ | Pi _ | Lam _ | Nat ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in

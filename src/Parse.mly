@@ -62,7 +62,7 @@ term_:
 | LET p = pattern COLON ty = ty EQ def = term IN body = term
   { B.let_ ~def ~ty ~body:(B.bound1 p body) }
 | FORALL params = parens(hyp)+ ARR body = ty
-  { B.forall_n ~params ~body }
+  { B.pi_n ~params ~body }
 | dom = term ARR cod = term
   { B.arrow ~dom ~cod }
 | ELIM scrut = term motive = motive

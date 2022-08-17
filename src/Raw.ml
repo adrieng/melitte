@@ -7,7 +7,7 @@ and pattern = pattern_desc Position.located
 type term_desc =
   | Var of Name.t
   | Let of { def : term; ty : ty; body : bound1; }
-  | Forall of ty * bound1
+  | Pi of ty * bound1
   | Lam of bound1
   | App of term * term
   | Nat
@@ -63,20 +63,20 @@ module Build = struct
   let let_ ?(loc = Position.dummy) ~def ~ty ~body () =
     Position.with_pos loc @@ Let { def; ty; body; }
 
-  let forall ?(loc = Position.dummy) ~dom ~cod () =
-    Position.with_pos loc @@ Forall (dom, cod)
+  let pi ?(loc = Position.dummy) ~dom ~cod () =
+    Position.with_pos loc @@ Pi (dom, cod)
 
-  let forall_n ?(loc = Position.dummy) ~params ~body () =
+  let pi_n ?(loc = Position.dummy) ~params ~body () =
     Position.{
         (List.fold_right
            (fun (p, a) b ->
              with_pos (join (join p.position a.position) b.position)
-               (Forall (a, bound1 p b))) params body)
+               (Pi (a, bound1 p b))) params body)
       with position = loc;
     }
 
   let arrow ?(loc = Position.dummy) ~dom ~cod () =
-    forall ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
+    pi ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
 
   let lam ?(loc = Position.dummy) ~param ~body () =
     Position.with_pos loc @@ Lam (bound1 param body)
@@ -155,9 +155,9 @@ module PPrint = struct
            ^/^ term body
          )
 
-    | Forall (_, Bound1 { pat = { Position.value = PVar _; _ }; _ }) as t ->
+    | Pi (_, Bound1 { pat = { Position.value = PVar _; _ }; _ }) as t ->
        let rec print_forall = function
-         | Forall (a, Bound1 { pat = { Position.value = PVar _; _ } as pat;
+         | Pi (a, Bound1 { pat = { Position.value = PVar _; _ } as pat;
                                body; }) ->
             parens (hyp pat a) ^/^ print_forall body.Position.value
          | t ->
@@ -165,9 +165,9 @@ module PPrint = struct
        in
        group (U.(doc forall) ^/^ print_forall t)
 
-    | Forall (_, Bound1 { pat = { Position.value = PWildcard; _ }; _ }) as t ->
+    | Pi (_, Bound1 { pat = { Position.value = PWildcard; _ }; _ }) as t ->
        let rec print_fun = function
-         | Forall (a, Bound1 { pat = { Position.value = PWildcard; _ };
+         | Pi (a, Bound1 { pat = { Position.value = PWildcard; _ };
                                body; }) ->
             typ a ^^ space ^^ U.(doc srarrow) ^/^ print_fun body.Position.value
          | t ->

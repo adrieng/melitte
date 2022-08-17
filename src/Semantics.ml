@@ -7,7 +7,7 @@ module L = UniverseLevel
 type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
-  | Forall of value * clo1
+  | Pi of value * clo1
   | Type of L.t
   | Nat
   | Zero
@@ -74,10 +74,10 @@ module Eval = struct
        let* u = term u in
        return @@ app t u
 
-    | C.Forall (dom, cod) ->
+    | C.Pi (dom, cod) ->
        let* dom = term dom in
        let* cod = close1 cod in
-       return @@ Forall (dom, cod)
+       return @@ Pi (dom, cod)
 
     | C.Let { def; body; _ } ->
        let* def = term def in
@@ -108,7 +108,7 @@ module Eval = struct
     match v with
     | Lam c ->
        clo1 c w
-    | Reflect { ty = Forall (a, b); tm; } ->
+    | Reflect { ty = Pi (a, b); tm; } ->
        Reflect { ty = clo1 b w; tm = App (tm, Reify { ty = a; tm = w; }); }
     | _ ->
        Error.internal "ill-typed evaluation"
@@ -197,16 +197,16 @@ module Quote = struct
     | Type _, Nat ->
        return @@ C.Build.nat ()
 
-    | Type _, Forall (a, f) ->
+    | Type _, Pi (a, f) ->
        let user = clo1_name f in
        let* a' = typ a in
        let* f =
          let$ x_a = fresh ~user a in
          normal_clo1 ~ty f x_a
        in
-       return @@ C.Build.forall a' f
+       return @@ C.Build.pi a' f
 
-    | Forall (a, f), _ ->
+    | Pi (a, f), _ ->
        let user = clo1_name f in
        let$ x = fresh ~user a in
        let* body = normal_ ~ty:(Eval.clo1 f x) ~tm:(Eval.app tm x) in
@@ -267,11 +267,11 @@ module Quote = struct
        in
        return @@ run ~eta:false ~free:0 @@ wrap_env (DeBruijn.Env.to_seq env)
 
-    | Forall (a, f) ->
+    | Pi (a, f) ->
        let user = clo1_name f in
        let* f = let$ x_a = fresh ~user a in normal_clo1 ~ty:limtype f x_a in
        let* a = normal_ ~ty:limtype ~tm:a in
-       return @@ C.Build.forall a f
+       return @@ C.Build.pi a f
 
     | Type (Fin level) ->
        return @@ C.Build.typ ~level ()
@@ -321,8 +321,8 @@ module Conv = struct
        level ~allow_subtype ~lo:l_lo ~hi:l_hi
 
     | Type _,
-      Forall (lo_dom, lo_cod),
-      Forall (hi_dom, hi_cod) ->
+      Pi (lo_dom, lo_cod),
+      Pi (hi_dom, hi_cod) ->
        normal_ ~allow_subtype ~ty ~lo:hi_dom ~hi:lo_dom
        &&&
          let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
@@ -341,7 +341,7 @@ module Conv = struct
       Suc hi ->
        normal_ ~allow_subtype ~ty ~lo ~hi
 
-    | Forall (dom, cod),
+    | Pi (dom, cod),
       _,
       _ ->
        let$ x = Quote.fresh ~user:(clo1_name cod) dom in

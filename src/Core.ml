@@ -3,7 +3,7 @@ open Sexplib.Std
 type term_desc =
   | Var of DeBruijn.Ix.t
   | Let of { def : term; ty : term; body : bound1; }
-  | Forall of term * bound1
+  | Pi of term * bound1
   | Lam of bound1
   | App of term * term
   | Nat
@@ -81,10 +81,10 @@ module ToRaw = struct
          let* t = term t in
          let* u = term u in
          return @@ Raw.App (t, u)
-      | Forall (a, f) ->
+      | Pi (a, f) ->
          let* a = term a in
          let* f = bound1 f in
-         return @@ Raw.Forall (a, f)
+         return @@ Raw.Pi (a, f)
       | Let { def; ty; body; } ->
          let* def = term def in
          let* ty = term ty in
@@ -155,7 +155,7 @@ module Build = struct
 
   let let_ ?loc ~def ~ty ~body () = desc ?loc @@ Let { def; ty; body; }
 
-  let forall ?loc a f = desc ?loc @@ Forall (a, f)
+  let pi ?loc a f = desc ?loc @@ Pi (a, f)
 
   let lam ?loc bound = desc ?loc @@ Lam bound
 

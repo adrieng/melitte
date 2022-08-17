@@ -8,7 +8,7 @@ type error =
                        actual : PPrint.document; }
   | Unexpected_type of { loc : Position.t; expected : PPrint.document; }
   | Unexpected_head_constr of { loc : Position.t;
-                                expected : [`Forall | `Univ];
+                                expected : [`Pi | `Univ];
                                 actual : PPrint.document; }
   | Universe_inconsistency of Position.t
 
@@ -40,7 +40,7 @@ let print fmt = function
   | Unexpected_head_constr { loc; expected; actual; } ->
      let open UnicodeSigil in
      let head_constr = function
-       | `Forall -> PPrint.(doc forall ^^ space ^^ underscore)
+       | `Pi -> PPrint.(doc forall ^^ space ^^ underscore)
        | `Univ -> doc typ
      in
      Format.fprintf fmt

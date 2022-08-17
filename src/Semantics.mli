@@ -3,7 +3,7 @@
 type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
-  | Forall of value * clo1
+  | Pi of value * clo1
   | Type of UniverseLevel.t
   | Nat
   | Zero
