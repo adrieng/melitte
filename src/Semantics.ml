@@ -8,6 +8,7 @@ type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
   | Pi of value * clo1
+  | Sigma of value * clo1
   | Type of L.t
   | Nat
   | Zero
@@ -78,6 +79,11 @@ module Eval = struct
        let* dom = term dom in
        let* cod = close1 cod in
        return @@ Pi (dom, cod)
+
+    | C.Sigma (dom, cod) ->
+       let* dom = term dom in
+       let* cod = close1 cod in
+       return @@ Sigma (dom, cod)
 
     | C.Let { def; body; _ } ->
        let* def = term def in
@@ -267,11 +273,17 @@ module Quote = struct
        in
        return @@ run ~eta:false ~free:0 @@ wrap_env (DeBruijn.Env.to_seq env)
 
-    | Pi (a, f) ->
+    | (Pi (a, f) | Sigma (a, f) as s) ->
+       let binder =
+         (* TODO refactor *)
+         match s with
+         | Pi _ -> C.Build.pi | Sigma _ -> C.Build.sigma
+         | _ -> assert false    (* absurd *)
+       in
        let user = clo1_name f in
        let* f = let$ x_a = fresh ~user a in normal_clo1 ~ty:limtype f x_a in
        let* a = normal_ ~ty:limtype ~tm:a in
-       return @@ C.Build.pi a f
+       return @@ binder a f
 
     | Type (Fin level) ->
        return @@ C.Build.typ ~level ()

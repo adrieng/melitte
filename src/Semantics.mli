@@ -4,6 +4,7 @@ type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
   | Pi of value * clo1
+  | Sigma of value * clo1
   | Type of UniverseLevel.t
   | Nat
   | Zero

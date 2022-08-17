@@ -8,6 +8,7 @@ type term_desc =
   | Var of Name.t
   | Let of { def : term; ty : ty; body : bound1; }
   | Pi of ty * bound1
+  | Sigma of ty * bound1
   | Lam of bound1
   | App of term * term
   | Nat
@@ -63,17 +64,26 @@ module Build = struct
   let let_ ?(loc = Position.dummy) ~def ~ty ~body () =
     Position.with_pos loc @@ Let { def; ty; body; }
 
-  let pi ?(loc = Position.dummy) ~dom ~cod () =
-    Position.with_pos loc @@ Pi (dom, cod)
-
-  let pi_n ?(loc = Position.dummy) ~params ~body () =
+  let binder_n ?(loc = Position.dummy) ~binder ~params ~body () =
     Position.{
         (List.fold_right
            (fun (p, a) b ->
              with_pos (join (join p.position a.position) b.position)
-               (Pi (a, bound1 p b))) params body)
+               (binder a (bound1 p b))) params body)
       with position = loc;
     }
+
+  let pi ?(loc = Position.dummy) ~dom ~cod () =
+    Position.with_pos loc @@ Pi (dom, cod)
+
+  let pi_n =
+    binder_n ~binder:(fun dom cod -> Pi (dom, cod))
+
+  let sigma ?(loc = Position.dummy) ~dom ~cod () =
+    Position.with_pos loc @@ Sigma (dom, cod)
+
+  let sigma_n =
+    binder_n ~binder:(fun dom cod -> Sigma (dom, cod))
 
   let arrow ?(loc = Position.dummy) ~dom ~cod () =
     pi ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
@@ -174,6 +184,26 @@ module PPrint = struct
             typ_desc t
        in
        group (print_fun t)
+
+    | Sigma (_, Bound1 { pat = { Position.value = PVar _; _ }; _ }) as t ->
+       let rec print_forall = function
+         | Sigma (a, Bound1 { pat = { Position.value = PVar _; _ } as pat;
+                               body; }) ->
+            parens (hyp pat a) ^/^ print_forall body.Position.value
+         | t ->
+            dot ^/^ typ_desc t
+       in
+       group (U.(doc sigma) ^/^ print_forall t)
+
+    | Sigma (_, Bound1 { pat = { Position.value = PWildcard; _ }; _ }) as t ->
+       let rec print_prod = function
+         | Sigma (a, Bound1 { pat = { Position.value = PWildcard; _ };
+                              body; }) ->
+            typ a ^^ space ^^ U.(doc times) ^/^ print_prod body.Position.value
+         | t ->
+            typ_desc t
+       in
+       group (print_prod t)
 
     | Natelim { scrut; motive; case_zero; case_suc; } ->
        let m = bind1 (!^ " with") U.(doc drarrow) motive in

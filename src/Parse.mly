@@ -7,7 +7,7 @@
 %token<string> ID
 %token<int> INT
 
-%token LAM FORALL LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
+%token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR
 %token UNDERSCORE COLON BAR COMMA
@@ -63,6 +63,8 @@ term_:
   { B.let_ ~def ~ty ~body:(B.bound1 p body) }
 | FORALL params = parens(hyp)+ ARR body = ty
   { B.pi_n ~params ~body }
+| SIGMA params = parens(hyp)+ body = ty
+  { B.sigma_n ~params ~body }
 | dom = term ARR cod = term
   { B.arrow ~dom ~cod }
 | ELIM scrut = term motive = motive

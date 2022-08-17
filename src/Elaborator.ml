@@ -134,7 +134,12 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      in
      return @@ C.Build.let_ ~loc ~def ~ty ~body ()
 
-  | Pi (a, f) ->
+  | Pi (a, f) | Sigma (a, f) ->
+     let binder =
+       match r with
+       | Pi _ -> C.Build.pi | Sigma _ -> C.Build.sigma
+       | _ -> assert false      (* absurd *)
+     in
      begin match expected with
      | S.Type _ ->
         let* a = check ~expected a in
@@ -143,7 +148,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
           let$ _ = fresh ~ty:asem (bound1_name f) in
           check_bound1 ~expected f
         in
-        return @@ C.Build.pi ~loc a f
+        return @@ binder ~loc a f
 
      | actual ->
         unexpected_head_constr ~expected:`Univ ~actual loc
@@ -210,10 +215,10 @@ and infer : R.term -> (C.term * S.ty) M.t =
           unexpected_head_constr ~expected:`Pi ~actual m.C.t_loc
        end
 
-    | R.Zero ->
+    | Zero ->
        return @@ (C.Build.zero ~loc (), S.Nat)
 
-    | R.Suc m ->
+    | Suc m ->
        let* m = check ~expected:Nat m in
        return @@ (C.Build.suc ~loc m, S.Nat)
 
@@ -240,7 +245,7 @@ and infer : R.term -> (C.term * S.ty) M.t =
        let level = i + 1 in
        return @@ (C.Build.typ ~level (), S.Type L.(fin level))
 
-    | Let _ | Pi _ | Lam _ | Nat ->
+    | Let _ | Pi _ | Sigma _ | Lam _ | Nat ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in

@@ -6,6 +6,7 @@ type term_desc =
   | Var of DeBruijn.Ix.t
   | Let of { def : term; ty : term; body : bound1; }
   | Pi of term * bound1
+  | Sigma of term * bound1
   | Lam of bound1
   | App of term * term
   | Nat
@@ -67,6 +68,7 @@ module Build : sig
              unit ->
              term
   val pi : ?loc:Position.t -> term -> bound1 -> term
+  val sigma : ?loc:Position.t -> term -> bound1 -> term
   val lam : ?loc:Position.t -> bound1 -> term
   val app : ?loc:Position.t -> term -> term -> term
   val nat : ?loc:Position.t -> unit -> term

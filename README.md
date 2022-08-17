@@ -34,4 +34,6 @@ type theory. Here are the ones I looked at:
 
 ## TODO
 
+- fix shift/reduce conflict in grammar
+- add term formers for sigma types
 - write a minimalistic Emacs mode with basic interaction facilities

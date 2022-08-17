@@ -20,6 +20,8 @@ type term_desc =
   (** Let statement, annotated with its type. *)
   | Pi of ty * bound1
   (** Dependent function type *)
+  | Sigma of ty * bound1
+  (** Dependent sum type *)
   | Lam of bound1
   (** Anonymous (dependent) function *)
   | App of term * term
@@ -77,6 +79,9 @@ module Build : sig
   val pi_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
                  unit -> ty
   val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
+  val sigma : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
+  val sigma_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+                 unit -> ty
   val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term
   val lam_n : ?loc:Position.t ->
               params:pattern list ->

@@ -39,3 +39,7 @@ val langle : t
 val rangle : t
 
 val omega : t
+
+val times : t
+
+val sigma : t

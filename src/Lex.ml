@@ -17,6 +17,7 @@ let keyword_or_ident =
   tabulate (fun n -> ID n)
     [
       ["forall"; "∀"], FORALL;
+      ["sig"; "Σ"], SIGMA;
       ["let"], LET;
       ["in"], IN;
       ["Type"; "𝕌"], TYPE;
