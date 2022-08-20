@@ -32,7 +32,7 @@ type theory. Here are the ones I looked at:
 
 - Jon Sterling's [DreamTT](https://github.com/jonsterling/dreamtt).
 
-## TODO
+## Future Additions
 
 ### Foundations
 

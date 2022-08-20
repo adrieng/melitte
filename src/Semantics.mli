@@ -57,6 +57,8 @@ module Eval : sig
   val clo1 : clo1 -> value -> value
 
   val clo2 : clo2 -> value -> value -> value
+
+  val fst : value -> value
 end
 
 (** {2 Quotation, from semantics to syntax} *)

@@ -238,8 +238,8 @@ and infer : R.term -> (C.term * S.ty) M.t =
        let* m, mty = infer m in
        begin match mty with
        | Sigma (_, f) ->
-          ignore f;             (* TODO *)
-          return @@ (C.Build.snd m, assert false)
+          let* msem = eval m in
+          return @@ (C.Build.snd m, S.Eval.(clo1 f (fst msem)))
 
        | actual ->
           unexpected_head_constr ~expected:`Sigma ~actual m.C.t_loc
