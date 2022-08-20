@@ -41,8 +41,8 @@ and bound2 =
 and ty = term
 
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; body : term; }
-  | Eval of { body : term; ty : ty; }
+  | Val of { name : Name.t; ty : ty; def : term; }
+  | Eval of { def : term; ty : ty; }
 
 and phrase = phrase_desc Position.located
 
@@ -134,11 +134,11 @@ module Build = struct
     if level < 0 then invalid_arg "typ";
     Position.with_pos loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ~name ~ty ~body () =
-    Position.with_pos loc @@ Val { name; ty; body; }
+  let val_ ?(loc = Position.dummy) ~name ~ty ~def () =
+    Position.with_pos loc @@ Val { name; ty; def; }
 
-  let eval ?(loc = Position.dummy) ~ty ~body () =
-    Position.with_pos loc @@ Eval { ty; body; }
+  let eval ?(loc = Position.dummy) ~ty ~def () =
+    Position.with_pos loc @@ Eval { ty; def; }
 end
 
 module PPrint = struct
@@ -317,10 +317,10 @@ module PPrint = struct
     group (pattern p ^^ space ^^ colon ^/^ typ ty)
 
   and phrase_desc = function
-    | Val { name; ty; body; } ->
-       bindN (!^ "val") equals [hyp (Build.pvar ~name ()) ty] (term body)
-    | Eval { body; ty; } ->
-       bindN (!^ "eval") colon [term body] (term ty)
+    | Val { name; ty; def; } ->
+       bindN (!^ "val") equals [hyp (Build.pvar ~name ()) ty] (term def)
+    | Eval { def; ty; } ->
+       bindN (!^ "eval") colon [term def] (term ty)
 
   and phrase p = Position.located phrase_desc p
 

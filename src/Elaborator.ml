@@ -124,15 +124,10 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
   let* () = on_check_pre ~expected tm in
   match r with
   | Let { def; ty; body; } ->
-     let* ty = check_is_ty ty in
-     let* tysem = eval ty in
-     let* def = check ~expected:tysem def in
-     let* body =
-       let* defsem = eval def in
-       let$ _ = fresh ~def:defsem ~ty:tysem @@ bound1_name body in
-       check_bound1 ~expected body
-     in
-     return @@ C.Build.let_ ~loc ~def ~ty ~body ()
+     check_def ~name:(bound1_name body) ~ty ~def
+       (fun ~ty ~def ->
+         let* body = check_bound1 ~expected body in
+         return @@ C.Build.let_ ~loc ~def ~ty ~body ())
 
   | Pi (a, f) | Sigma (a, f) ->
      let binder =
@@ -303,24 +298,31 @@ and check_bound2 : expected:S.ty -> R.bound2 -> C.bound2 M.t =
                        user2 = Raw.name_option_of_pattern pat2;
                        body; }
 
+and check_def : 'a. name:Name.t -> ty:R.ty -> def:R.term ->
+                         (ty:C.ty -> def:C.term -> 'a M.t) -> 'a M.t =
+  fun ~name ~ty ~def k ->
+  let* ty = check_is_ty ty in
+  let* tysem = eval ty in
+  let* def = check ~expected:tysem def in
+  let* defsem = eval def in
+  let$ _ = fresh ~def:defsem ~ty:tysem name in
+  k ~ty ~def
+
 let phrase : R.phrase -> C.t M.t -> C.t M.t =
   fun Position.{ value; position = loc; } file ->
   match value with
-  | Val { name; ty; body; } ->
+  | Val { name; ty; def; } ->
+     check_def ~name ~ty ~def
+       (fun ~ty ~def ->
+         let* file = file in
+         return @@ C.Build.val_ ~loc ~user:name ~ty ~def () :: file)
+  | Eval { def; ty; } ->
      let* ty = check_is_ty ty in
      let* tysem = eval ty in
-     let* body = check ~expected:tysem body in
-     let* bodysem = eval body in
-     let$ _ = fresh ~def:bodysem ~ty:tysem name in
+     let* def = check ~expected:tysem def in
+     let* def = liftE @@ S.Conv.normalize ~ty:tysem ~tm:def in
      let* file = file in
-     return @@ (C.Build.val_ ~loc ~user:name ~ty ~body () :: file)
-  | Eval { body; ty; } ->
-     let* ty = check_is_ty ty in
-     let* tysem = eval ty in
-     let* body = check ~expected:tysem body in
-     let* body = liftE @@ S.Conv.normalize ~ty:tysem ~tm:body in
-     let* file = file in
-     return @@ C.Build.eval ~loc ~body ~ty () :: file
+     return @@ C.Build.eval ~loc ~def ~ty () :: file
 
 let rec check = function
   | [] ->

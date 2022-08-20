@@ -42,14 +42,14 @@ type theory. Here are the ones I looked at:
 
 ### Engineering
 
-- add explicit telescopes as arguments of pi and sigma
+- explicit telescopes as arguments of pi and sigma
 
 ### Usability
 
-- add built-in non-dependent arrow and product types for better printing
-- write a minimalistic Emacs mode with basic interaction facilities
+- built-in non-dependent arrow and product types for better printing
+- basic module system
+- minimalistic Emacs mode with basic interaction facilities
 
 ### Refinement
 
-- add unification facilities for metavariables and implicit arguments
-
+- unification facilities for metavariables and implicit arguments

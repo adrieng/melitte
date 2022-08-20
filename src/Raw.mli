@@ -64,8 +64,8 @@ and bound2 =
 and ty = term
 
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; body : term; }
-  | Eval of { body : term; ty : term; }
+  | Val of { name : Name.t; ty : ty; def : term; }
+  | Eval of { def : term; ty : ty; }
 
 and phrase = phrase_desc Position.located
 
@@ -115,9 +115,9 @@ module Build : sig
   val val_ : ?loc:Position.t ->
              name:Name.t ->
              ty:term ->
-             body:term ->
+             def:term ->
              unit -> phrase
-  val eval : ?loc:Position.t -> ty:term -> body:term -> unit -> phrase
+  val eval : ?loc:Position.t -> ty:term -> def:term -> unit -> phrase
 end
 
 module PPrint : sig

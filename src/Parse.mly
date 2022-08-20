@@ -103,10 +103,10 @@ hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
 phrase_desc:
-| VAL name = name COLON ty = ty EQ body = term
-  { B.val_ ~name ~ty ~body }
-| EVAL body = term COLON ty = ty
-  { B.eval ~body ~ty }
+| VAL name = name COLON ty = ty EQ def = term
+  { B.val_ ~name ~ty ~def }
+| EVAL def = term COLON ty = ty
+  { B.eval ~def ~ty }
 
 %inline phrase:
 | p = located(phrase_desc) { p }

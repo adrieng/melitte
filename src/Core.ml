@@ -41,8 +41,8 @@ and bound2 =
     }
 
 and phrase_desc =
-  | Val of { user : Name.t option; ty : term; body : term; }
-  | Eval of { body : term; ty : term; }
+  | Val of { user : Name.t option; ty : term; def : term; }
+  | Eval of { def : term; ty : term; }
 
 and phrase =
   {
@@ -141,17 +141,17 @@ module ToRaw = struct
   let phrase { ph_desc; ph_loc; } =
     let* desc, env =
       match ph_desc with
-      | Val { user; ty; body; } ->
+      | Val { user; ty; def; } ->
          let name = Name.of_option user in
-         let* body = term body in
+         let* def = term def in
          let* ty = term ty in
          let* env = M.get in
-         return (Raw.Val { name; ty; body; }, DeBruijn.Env.extend name env)
-      | Eval { ty; body; } ->
+         return (Raw.Val { name; ty; def; }, DeBruijn.Env.extend name env)
+      | Eval { ty; def; } ->
          let* ty = term ty in
-         let* body = term body in
+         let* def = term def in
          let* env = M.get in
-         return (Raw.Eval { ty; body; }, env)
+         return (Raw.Eval { ty; def; }, env)
     in
     return @@ (Position.with_pos ph_loc desc, env)
 
@@ -198,11 +198,11 @@ module Build = struct
 
   let typ ?loc ~level () = desc ?loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ?user ~ty ~body () =
-    { ph_loc = loc; ph_desc = Val { user; ty; body; } }
+  let val_ ?(loc = Position.dummy) ?user ~ty ~def () =
+    { ph_loc = loc; ph_desc = Val { user; ty; def; } }
 
-  let eval ?(loc = Position.dummy) ~ty ~body () =
-    { ph_loc = loc; ph_desc = Eval { body; ty; } }
+  let eval ?(loc = Position.dummy) ~ty ~def () =
+    { ph_loc = loc; ph_desc = Eval { def; ty; } }
 end
 
 module PPrint = struct

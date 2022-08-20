@@ -41,8 +41,8 @@ and bound2 =
     }
 
 and phrase_desc =
-  | Val of { user : Name.t option; ty : term; body : term; }
-  | Eval of { body : term; ty : term; }
+  | Val of { user : Name.t option; ty : term; def : term; }
+  | Eval of { def : term; ty : term; }
 
 and phrase =
   {
@@ -90,12 +90,12 @@ module Build : sig
   val val_ : ?loc:Position.t ->
              ?user:Name.t ->
              ty:ty ->
-             body:term ->
+             def:term ->
              unit ->
              phrase
   val eval : ?loc:Position.t ->
              ty:ty ->
-             body:term ->
+             def:term ->
              unit ->
              phrase
 end
