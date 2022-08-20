@@ -9,12 +9,13 @@
 
 %token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
 %token LPAREN RPAREN LBRACE RBRACE
-%token EQ ARR DARR
+%token EQ ARR DARR TIMES
 %token UNDERSCORE COLON BAR COMMA
 %token EOF
 
 %nonassoc IN DARR
 %right ARR
+%right TIMES
 
 %start<Raw.t> file
 
@@ -63,10 +64,12 @@ term_:
   { B.let_ ~def ~ty ~body:(B.bound1 p body) }
 | FORALL params = parens(hyp)+ ARR body = ty
   { B.pi_n ~params ~body }
-| SIGMA params = parens(hyp)+ body = ty
+| SIGMA params = parens(hyp)+ TIMES body = ty
   { B.sigma_n ~params ~body }
 | dom = term ARR cod = term
   { B.arrow ~dom ~cod }
+| left = term TIMES right = term
+  { B.product ~left ~right }
 | ELIM scrut = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term

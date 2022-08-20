@@ -51,3 +51,7 @@ Melitte contains a hierarchy of universes.
   $ melitte t4.melitte
   File "t4.melitte", line 1, characters 23-26: universe inconsistency
   [1]
+
+Melitte contains Σ types.
+
+  $ melitte t5.melitte

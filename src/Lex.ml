@@ -28,6 +28,7 @@ let keyword_or_ident =
       ["with"], WITH;
       ["val"], VAL;
       ["eval"], EVAL;
+      ["×"], TIMES;
     ]
 
 (** {1 Error handling} *)
@@ -76,6 +77,7 @@ let rec token lexbuf = match%sedlex lexbuf with
   | ":" -> COLON
   | "|" -> BAR
   | "," -> COMMA
+  | "*" -> TIMES
   | '\\' | 955 -> LAM
 
   | nat -> INT (int_of_lexbuf lexbuf)

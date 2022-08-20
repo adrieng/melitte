@@ -111,7 +111,7 @@ let () =
          " set output encoding";
          "-type-in-type", Set Options.type_in_type,
          " accept type-in-type (inconsistent)";
-         "-debug", Set Options.debug,
+         "-d", Set Options.debug,
          " enable debugging features";
          "-v", Set Options.verbose,
          " print actions during elaboration";

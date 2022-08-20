@@ -79,14 +79,17 @@ module Build = struct
   let pi_n =
     binder_n ~binder:(fun dom cod -> Pi (dom, cod))
 
-  let sigma ?(loc = Position.dummy) ~dom ~cod () =
-    Position.with_pos loc @@ Sigma (dom, cod)
+  let sigma ?(loc = Position.dummy) ~base ~total () =
+    Position.with_pos loc @@ Sigma (base, total)
 
   let sigma_n =
     binder_n ~binder:(fun dom cod -> Sigma (dom, cod))
 
   let arrow ?(loc = Position.dummy) ~dom ~cod () =
     pi ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
+
+  let product ?(loc = Position.dummy) ~left ~right () =
+    sigma ~loc ~base:left ~total:(bound1 (pwildcard ~loc ()) right) ()
 
   let lam ?(loc = Position.dummy) ~param ~body () =
     Position.with_pos loc @@ Lam (bound1 param body)
