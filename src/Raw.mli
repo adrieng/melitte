@@ -20,12 +20,18 @@ type term_desc =
   (** Let statement, annotated with its type. *)
   | Pi of ty * bound1
   (** Dependent function type *)
-  | Sigma of ty * bound1
-  (** Dependent sum type *)
   | Lam of bound1
   (** Anonymous (dependent) function *)
   | App of term * term
   (** Application *)
+  | Sigma of ty * bound1
+  (** Dependent sum type *)
+  | Pair of term * term
+  (** Sum constructor *)
+  | Fst of term
+  (** First projection *)
+  | Snd of term
+  (** Second projection *)
   | Nat
   (** Type of natural numbers. *)
   | Zero
@@ -79,10 +85,6 @@ module Build : sig
   val pi_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
                  unit -> ty
   val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
-  val sigma : ?loc:Position.t -> base:ty -> total:bound1 -> unit -> ty
-  val sigma_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
-                 unit -> ty
-  val product : ?loc:Position.t -> left:ty -> right:ty -> unit -> ty
   val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term
   val lam_n : ?loc:Position.t ->
               params:pattern list ->
@@ -90,6 +92,13 @@ module Build : sig
               unit -> term
   val app : ?loc:Position.t -> func:term -> arg:term -> unit -> term
   val app_n : ?loc:Position.t -> func:term -> args:term list -> unit -> term
+  val sigma : ?loc:Position.t -> base:ty -> total:bound1 -> unit -> ty
+  val sigma_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+                 unit -> ty
+  val product : ?loc:Position.t -> left:ty -> right:ty -> unit -> ty
+  val pair : ?loc:Position.t -> left:term -> right:term -> unit -> term
+  val fst : ?loc:Position.t -> arg:term -> unit -> term
+  val snd : ?loc:Position.t -> arg:term -> unit -> term
   val nat : ?loc:Position.t -> unit -> term
   val zero : ?loc:Position.t -> unit -> term
   val suc : ?loc:Position.t -> t:term -> unit -> term

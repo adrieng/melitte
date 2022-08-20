@@ -8,9 +8,12 @@ type term_desc =
   | Var of Name.t
   | Let of { def : term; ty : ty; body : bound1; }
   | Pi of ty * bound1
-  | Sigma of ty * bound1
   | Lam of bound1
   | App of term * term
+  | Sigma of ty * bound1
+  | Pair of term * term
+  | Fst of term
+  | Snd of term
   | Nat
   | Zero
   | Suc of term
@@ -79,17 +82,8 @@ module Build = struct
   let pi_n =
     binder_n ~binder:(fun dom cod -> Pi (dom, cod))
 
-  let sigma ?(loc = Position.dummy) ~base ~total () =
-    Position.with_pos loc @@ Sigma (base, total)
-
-  let sigma_n =
-    binder_n ~binder:(fun dom cod -> Sigma (dom, cod))
-
   let arrow ?(loc = Position.dummy) ~dom ~cod () =
     pi ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
-
-  let product ?(loc = Position.dummy) ~left ~right () =
-    sigma ~loc ~base:left ~total:(bound1 (pwildcard ~loc ()) right) ()
 
   let lam ?(loc = Position.dummy) ~param ~body () =
     Position.with_pos loc @@ Lam (bound1 param body)
@@ -102,6 +96,24 @@ module Build = struct
 
   let app_n ?(loc = Position.dummy) ~func ~args () =
     List.fold_left (fun func arg -> app ~loc ~func ~arg ()) func args
+
+  let sigma ?(loc = Position.dummy) ~base ~total () =
+    Position.with_pos loc @@ Sigma (base, total)
+
+  let sigma_n =
+    binder_n ~binder:(fun dom cod -> Sigma (dom, cod))
+
+  let product ?(loc = Position.dummy) ~left ~right () =
+    sigma ~loc ~base:left ~total:(bound1 (pwildcard ~loc ()) right) ()
+
+  let pair ?(loc = Position.dummy) ~left ~right () =
+    Position.with_pos loc @@ Pair (left, right)
+
+  let fst ?(loc = Position.dummy) ~arg () =
+    Position.with_pos loc @@ Fst arg
+
+  let snd ?(loc = Position.dummy) ~arg () =
+    Position.with_pos loc @@ Snd arg
 
   let nat ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Nat
@@ -142,7 +154,7 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type _ | Nat | Zero | Suc _ | App _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _ | App _ | Fst _ | Snd _) as t ->
        group (simple_term_desc t)
 
     | Lam _ as t ->
@@ -218,8 +230,11 @@ module PPrint = struct
                         bind2 (!^ " suc") U.(doc drarrow) case_suc;
                       ] ^^ break 1)
 
+    | Pair (left, right) ->
+       parens @@ group @@ term left ^^ comma ^/^ term right
+
   and simple_term_desc = function
-    | (Var _ | Type _ | Nat | Zero | Suc _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _ | Fst _ | Snd _) as t ->
        very_simple_term_desc t
 
     | App (t, u) ->
@@ -258,6 +273,12 @@ module PPrint = struct
        | Some t ->
           Sigs.Int.fold (prefix 2 1 (!^ "suc")) k (simple_term_desc t)
        end
+
+    | Fst t ->
+       prefix 2 1 (!^ "fst") (very_simple_term t)
+
+    | Snd t ->
+       prefix 2 1 (!^ "snd") (very_simple_term t)
 
     | t ->
        parens (term_desc t)

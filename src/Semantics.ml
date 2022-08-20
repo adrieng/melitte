@@ -9,6 +9,7 @@ type value =
   | Lam of clo1
   | Pi of value * clo1
   | Sigma of value * clo1
+  | Pair of value * value
   | Type of L.t
   | Nat
   | Zero
@@ -18,6 +19,8 @@ and neutral =
   | Var of DeBruijn.Lv.t
   | App of neutral * normal
   | Natelim of neutral * clo1 * value * clo2
+  | Fst of neutral
+  | Snd of neutral
 
 and normal =
   | Reify of { ty : value; tm : value; }
@@ -85,6 +88,19 @@ module Eval = struct
        let* cod = close1 cod in
        return @@ Sigma (dom, cod)
 
+    | C.Pair (left, right) ->
+       let* left = term left in
+       let* right = term right in
+       return @@ Pair (left, right)
+
+    | C.Fst t ->
+       let* t = term t in
+       return @@ fst t
+
+    | C.Snd t ->
+       let* t = term t in
+       return @@ snd t
+
     | C.Let { def; body; _ } ->
        let* def = term def in
        let* body = close1 body in
@@ -116,6 +132,22 @@ module Eval = struct
        clo1 c w
     | Reflect { ty = Pi (a, b); tm; } ->
        Reflect { ty = clo1 b w; tm = App (tm, Reify { ty = a; tm = w; }); }
+    | _ ->
+       Error.internal "ill-typed evaluation"
+
+  and fst = function
+    | Pair (l, _) ->
+       l
+    | Reflect { ty = Sigma (a, _); tm; } ->
+       Reflect { ty = a; tm = Fst tm; }
+    | _ ->
+       Error.internal "ill-typed evaluation"
+
+  and snd = function
+    | Pair (_, r) ->
+       r
+    | Reflect { ty = Sigma (_, f); tm; } as tot ->
+       Reflect { ty = clo1 f (fst tot); tm = Snd tm; }
     | _ ->
        Error.internal "ill-typed evaluation"
 
@@ -175,6 +207,14 @@ module Quote = struct
        let* nf = normal nf in
        return @@ C.Build.app ne nf
 
+    | Fst ne ->
+       let* ne = neutral ne in
+       return @@ C.Build.fst ne
+
+    | Snd ne ->
+       let* ne = neutral ne in
+       return @@ C.Build.snd ne
+
     | Natelim (scrut, motive, case_zero, case_succ) ->
        let user = clo1_name motive in
        let* scrut = neutral scrut in
@@ -217,6 +257,12 @@ module Quote = struct
        let$ x = fresh ~user a in
        let* body = normal_ ~ty:(Eval.clo1 f x) ~tm:(Eval.app tm x) in
        return @@ C.Build.lam (Bound1 { body; user = None; })
+
+    | Sigma (a, f), _ ->
+       let base = Eval.fst tm in
+       let* left = normal_ ~ty:a ~tm:base in
+       let* right = normal_ ~ty:(Eval.clo1 f base) ~tm:(Eval.snd tm) in
+       return @@ C.Build.pair left right
 
     | Nat, Zero ->
        return @@ C.Build.zero ()
@@ -285,6 +331,11 @@ module Quote = struct
        let* a = normal_ ~ty:limtype ~tm:a in
        return @@ binder a f
 
+    | Pair (left, right) ->
+       let* left = value left in
+       let* right = value right in
+       return @@ C.Build.pair left right
+
     | Type (Fin level) ->
        return @@ C.Build.typ ~level ()
 
@@ -335,13 +386,12 @@ module Conv = struct
     | Type _,
       Pi (lo_dom, lo_cod),
       Pi (hi_dom, hi_cod) ->
-       normal_ ~allow_subtype ~ty ~lo:hi_dom ~hi:lo_dom
-       &&&
-         let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
-         normal_ ~allow_subtype
-           ~ty
-           ~lo:(Eval.clo1 lo_cod x)
-           ~hi:(Eval.clo1 hi_cod x)
+       binder1 ~allow_subtype ~ty ~lo_dom ~lo_cod ~hi_dom ~hi_cod
+
+    | Type _,
+      Sigma (lo_dom, lo_cod),
+      Sigma (hi_dom, hi_cod) ->
+       binder1 ~allow_subtype ~ty ~lo_dom ~lo_cod ~hi_dom ~hi_cod
 
     | Nat,
       Zero,
@@ -363,8 +413,26 @@ module Conv = struct
          ~lo:(Eval.app lo x)
          ~hi:(Eval.app hi x)
 
+    | Sigma (dom, cod),
+      _,
+      _ ->
+       normal_ ~allow_subtype ~ty:dom ~lo:(Eval.fst lo) ~hi:(Eval.fst hi)
+       &&& normal_ ~allow_subtype
+             ~ty:(Eval.clo1 cod (Eval.fst lo))
+             ~lo:(Eval.snd lo)
+             ~hi:(Eval.snd hi)
+
     | _ ->
        return false
+
+  and binder1 ~allow_subtype ~ty ~lo_dom ~lo_cod ~hi_dom ~hi_cod =
+    normal_ ~allow_subtype ~ty ~lo:hi_dom ~hi:lo_dom
+    &&&
+      let$ x = Quote.fresh ~user:(clo1_name lo_cod) lo_dom in
+      normal_ ~allow_subtype
+        ~ty
+        ~lo:(Eval.clo1 lo_cod x)
+        ~hi:(Eval.clo1 hi_cod x)
 
   and normal ~allow_subtype ~lo ~hi =
     let Reify { tm = lo; ty = lo_ty; } = lo in

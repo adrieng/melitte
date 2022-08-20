@@ -34,6 +34,22 @@ type theory. Here are the ones I looked at:
 
 ## TODO
 
-- fix shift/reduce conflict in grammar
-- add term formers for sigma types
+### Foundations
+
+- inductive types (W-types, a universe of descriptions à la indexed
+  container gang?)
+- universe of definitionally-irrelevant propositions
+
+### Engineering
+
+- add explicit telescopes as arguments of pi and sigma
+
+### Usability
+
+- add built-in non-dependent arrow and product types for better printing
 - write a minimalistic Emacs mode with basic interaction facilities
+
+### Refinement
+
+- add unification facilities for metavariables and implicit arguments
+

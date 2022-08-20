@@ -4,9 +4,12 @@ type term_desc =
   | Var of DeBruijn.Ix.t
   | Let of { def : term; ty : term; body : bound1; }
   | Pi of term * bound1
-  | Sigma of term * bound1
   | Lam of bound1
   | App of term * term
+  | Sigma of term * bound1
+  | Pair of term * term
+  | Fst of term
+  | Snd of term
   | Nat
   | Zero
   | Suc of term
@@ -90,6 +93,16 @@ module ToRaw = struct
          let* a = term a in
          let* f = bound1 f in
          return @@ Raw.Sigma (a, f)
+      | Pair (l, r) ->
+         let* l = term l in
+         let* r = term r in
+         return @@ Raw.Pair (l, r)
+      | Fst m ->
+         let* m = term m in
+         return @@ Raw.Fst m
+      | Snd m ->
+         let* m = term m in
+         return @@ Raw.Snd m
       | Let { def; ty; body; } ->
          let* def = term def in
          let* ty = term ty in
@@ -162,11 +175,17 @@ module Build = struct
 
   let pi ?loc a f = desc ?loc @@ Pi (a, f)
 
-  let sigma ?loc a f = desc ?loc @@ Sigma (a, f)
-
   let lam ?loc bound = desc ?loc @@ Lam bound
 
   let app ?loc t u = desc ?loc @@ App (t, u)
+
+  let sigma ?loc a f = desc ?loc @@ Sigma (a, f)
+
+  let pair ?loc left right = desc ?loc @@ Pair (left, right)
+
+  let fst ?loc arg = desc ?loc @@ Fst arg
+
+  let snd ?loc arg = desc ?loc @@ Snd arg
 
   let nat ?loc () = desc ?loc Nat
 

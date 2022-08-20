@@ -5,6 +5,7 @@ type value =
   | Lam of clo1
   | Pi of value * clo1
   | Sigma of value * clo1
+  | Pair of value * value
   | Type of UniverseLevel.t
   | Nat
   | Zero

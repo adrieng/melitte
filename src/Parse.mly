@@ -7,7 +7,7 @@
 %token<string> ID
 %token<int> INT
 
-%token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL
+%token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL FST SND
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR TIMES
 %token UNDERSCORE COLON BAR COMMA
@@ -37,6 +37,8 @@ very_simple_term_:
 | k = INT { B.lit ~k }
 | ZERO { B.zero }
 | SUC t = very_simple_term { B.suc ~t }
+| FST arg = very_simple_term { B.fst ~arg }
+| SND arg = very_simple_term { B.snd ~arg }
 | te = parens(term_) { te }
 
 %inline very_simple_term:
@@ -76,6 +78,8 @@ term_:
   BAR SUC case_suc = bind2(DARR)
   RBRACE
   { B.natelim ~scrut ~motive ~case_zero ~case_suc }
+| LPAREN left = term COMMA right = term RPAREN
+  { B.pair ~left ~right }
 
 %inline term:
 | located(term_) { $1 }

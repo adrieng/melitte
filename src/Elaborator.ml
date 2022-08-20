@@ -165,6 +165,20 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
         unexpected_type ~expected loc
      end
 
+  | Pair (left, right) ->
+     begin match expected with
+     | Sigma (a, f) ->
+        let* left = check ~expected:a left in
+        let* right =
+          let* leftsem = eval left in
+          check ~expected:(S.Eval.clo1 f leftsem) right
+        in
+        return @@ C.Build.pair ~loc left right
+
+     | _ ->
+        unexpected_type ~expected loc
+     end
+
   | Nat ->
      begin match expected with
      | Type _ ->
@@ -186,7 +200,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
 
      end
 
-  | Var _ | App _ | Zero | Suc _ | Natelim _ ->
+  | Var _ | App _ | Zero | Suc _ | Natelim _ | Fst _ | Snd _ ->
      let* tm, actual = infer tm in
      let* () = check_conv ~expected ~actual loc in
      return tm
@@ -213,6 +227,27 @@ and infer : R.term -> (C.term * S.ty) M.t =
 
        | actual ->
           unexpected_head_constr ~expected:`Pi ~actual m.C.t_loc
+       end
+
+    | Fst m ->
+       let* m, mty = infer m in
+       begin match mty with
+       | Sigma (a, _) ->
+          return @@ (C.Build.fst m, a)
+
+       | actual ->
+          unexpected_head_constr ~expected:`Sigma ~actual m.C.t_loc
+       end
+
+    | Snd m ->
+       let* m, mty = infer m in
+       begin match mty with
+       | Sigma (_, f) ->
+          ignore f;             (* TODO *)
+          return @@ (C.Build.snd m, assert false)
+
+       | actual ->
+          unexpected_head_constr ~expected:`Sigma ~actual m.C.t_loc
        end
 
     | Zero ->
@@ -245,7 +280,7 @@ and infer : R.term -> (C.term * S.ty) M.t =
        let level = i + 1 in
        return @@ (C.Build.typ ~level (), S.Type L.(fin level))
 
-    | Let _ | Pi _ | Sigma _ | Lam _ | Nat ->
+    | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in

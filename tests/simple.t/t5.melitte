@@ -1,3 +1,7 @@
-val isMagma : 𝕌 0 → 𝕌 0 = λ A ⇒ A × (A → A → A)
+val MagmaStruct : 𝕌 0 → 𝕌 0 = λ A ⇒ A × (A → A → A)
 
-val Magma : 𝕌 1 = Σ(A : 𝕌 0) × isMagma A
+val Magma : 𝕌 1 = Σ(A : 𝕌 0) × MagmaStruct A
+
+val add : ℕ → ℕ → ℕ = λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ 0 | suc _, r ⇒ suc r }
+
+val Magma-ℕ : Magma = (ℕ, (zero, add))

@@ -28,6 +28,8 @@ let keyword_or_ident =
       ["with"], WITH;
       ["val"], VAL;
       ["eval"], EVAL;
+      ["fst"; "π₁"], FST;
+      ["snd"; "π₂"], SND;
       ["×"], TIMES;
     ]
 
@@ -52,7 +54,7 @@ let invalid_character lexbuf =
 let quark = [%sedlex.regexp? alphabetic | other_alphabetic
              | math | other_math | '_']
 
-let atom = [%sedlex.regexp? quark, Star (quark | ascii_hex_digit)]
+let atom = [%sedlex.regexp? quark, Star (quark | ascii_hex_digit | '-')]
 
 let nat = [%sedlex.regexp? Plus ('0' .. '9')]
 
