@@ -14,10 +14,8 @@ and pattern = pattern_desc Position.located
 type term_desc =
   | Var of Name.t
   (** Variable occurence *)
-  | Let of { def : term;
-             ty : ty;
-             body : bound1; }
-  (** Let statement, annotated with its type. *)
+  | Let of def * term
+  (** Let statement *)
   | Pi of ty * bound1
   (** Dependent function type *)
   | Lam of bound1
@@ -35,18 +33,34 @@ type term_desc =
   | Nat
   (** Type of natural numbers. *)
   | Zero
-  (** Nullary constructor of [Nat]. *)
+  (** Nullary constructor of [Nat] *)
   | Suc of term
-  (** Unary constructor of [Nat]. *)
+  (** Unary constructor of [Nat] *)
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
-  (** Dependent elimination form for natural numbers. *)
+  (** Dependent elimination form for natural numbers *)
   | Type of int
-  (** Universe hierarchy. *)
+  (** Universe hierarchy *)
 
 and term = term_desc Position.located
+
+and telescope = hypothesis list
+
+and hypothesis_desc =
+  H of {
+      bound : pattern;
+      ty : term;
+    }
+
+and hypothesis = hypothesis_desc Position.located
+
+and boundN =
+  BoundN of {
+      tele : telescope;
+      body : term;
+    }
 
 and bound1 =
   Bound1 of {
@@ -63,8 +77,21 @@ and bound2 =
 
 and ty = term
 
+and def =
+  Def of {
+      pat : pattern;
+      args : telescope;
+      body : annotated;
+    }
+
+and annotated =
+  Ann of {
+      body : term;
+      ty : ty;
+    }
+
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; def : term; }
+  | Val of def
   | Eval of { def : term; ty : ty; }
 
 and phrase = phrase_desc Position.located
@@ -77,47 +104,40 @@ module Build : sig
      argument is never erased, making it possible to deal with locations in a
      uniform way in {! Parse}. *)
 
-  val pvar : ?loc:Position.t -> name:Name.t -> unit -> pattern
-  val pwildcard : ?loc:Position.t -> unit -> pattern
-  val var : ?loc:Position.t -> name:Name.t -> unit -> term
-  val let_ : ?loc:Position.t -> def:term -> ty:ty -> body:bound1 -> unit -> term
-  val pi : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
-  val pi_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
-                 unit -> ty
-  val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
-  val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term
-  val lam_n : ?loc:Position.t ->
-              params:pattern list ->
-              body:term ->
-              unit -> term
-  val app : ?loc:Position.t -> func:term -> arg:term -> unit -> term
-  val app_n : ?loc:Position.t -> func:term -> args:term list -> unit -> term
-  val sigma : ?loc:Position.t -> base:ty -> total:bound1 -> unit -> ty
-  val sigma_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
-                 unit -> ty
-  val product : ?loc:Position.t -> left:ty -> right:ty -> unit -> ty
-  val pair : ?loc:Position.t -> left:term -> right:term -> unit -> term
-  val fst : ?loc:Position.t -> arg:term -> unit -> term
-  val snd : ?loc:Position.t -> arg:term -> unit -> term
-  val nat : ?loc:Position.t -> unit -> term
-  val zero : ?loc:Position.t -> unit -> term
-  val suc : ?loc:Position.t -> t:term -> unit -> term
-  val lit : ?loc:Position.t -> k:int -> unit -> term
-  val natelim : ?loc:Position.t ->
-                scrut:term ->
-                motive:bound1 ->
-                case_zero:term ->
-                case_suc:bound2 ->
-                unit -> term
-  val typ : ?loc:Position.t -> level:int -> unit -> term
+  type 'a builder = ?loc:Position.t -> unit -> 'a
+
+  val pvar : name:Name.t -> pattern builder
+  val pwildcard : pattern builder
+  val var : name:Name.t -> term builder
+  val let_ : def:def -> body:term -> term builder
+  val pi : dom:ty -> cod:bound1 -> ty builder
+  val pi_n : params:(pattern * ty) list -> body:ty -> ty builder
+  val arrow : dom:ty -> cod:ty -> ty builder
+  val lam : param:pattern -> body:term -> term builder
+  val lam_n : params:pattern list -> body:term -> term builder
+  val app : func:term -> arg:term -> term builder
+  val app_n : func:term -> args:term list -> term builder
+  val sigma : base:ty -> total:bound1 -> ty builder
+  val sigma_n : params:(pattern * ty) list -> body:ty -> ty builder
+  val product : left:ty -> right:ty -> ty builder
+  val pair : left:term -> right:term -> term builder
+  val fst : arg:term -> term builder
+  val snd : arg:term -> term builder
+  val nat : term builder
+  val zero : term builder
+  val suc : t:term -> term builder
+  val lit : k:int -> term builder
+  val natelim : scrut:term -> motive:bound1 ->
+                case_zero:term -> case_suc:bound2 ->
+                term builder
+  val typ : level:int -> ty builder
+  val hypothesis : bound:pattern -> ty:term -> hypothesis builder
+  val def : pat:pattern -> args:telescope -> ty:term -> body:term ->
+            def builder
   val bound1 : pattern -> term -> bound1
   val bound2 : pattern -> pattern -> term -> bound2
-  val val_ : ?loc:Position.t ->
-             name:Name.t ->
-             ty:term ->
-             def:term ->
-             unit -> phrase
-  val eval : ?loc:Position.t -> ty:term -> def:term -> unit -> phrase
+  val val_ : def:def -> phrase builder
+  val eval : ty:term -> def:term -> phrase builder
 end
 
 module PPrint : sig

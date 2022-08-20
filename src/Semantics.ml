@@ -101,10 +101,8 @@ module Eval = struct
        let* t = term t in
        return @@ snd t
 
-    | C.Let { def; body; _ } ->
-       let* def = term def in
-       let* body = close1 body in
-       return @@ clo1 body def
+    | C.Let (d, body) ->
+       let_ d (term body)
 
     | C.Type l ->
        return @@ Type (UniverseLevel.fin l)
@@ -125,6 +123,15 @@ module Eval = struct
        let* case_zero = term case_zero in (* probably suboptimal *)
        let* case_suc = close2 case_suc in
        return @@ nat_elim scrut motive case_zero case_suc
+
+  and annot (C.Ann { body; _ }) =
+    term body
+
+  and let_ : 'a. C.def -> 'a M.t -> 'a M.t =
+    fun (C.Def { user; body; _ }) k ->
+    let* v = annot body in
+    let* env = extend_eval ?user v in
+    return @@ k env
 
   and app v w =
     match v with
@@ -238,7 +245,7 @@ module Quote = struct
     | Type l1, Type (Fin level) ->
        if not !Options.type_in_type && L.(l1 <= fin level)
        then Error.internal "ill-typed normal quotation: universe level"
-       else return @@ C.Build.typ ~level ()
+       else return @@ C.Build.typ level
 
     | Type _, Nat ->
        return @@ C.Build.nat ()
@@ -314,8 +321,10 @@ module Quote = struct
               | Some ty -> value ty
             in
             let* body = weaken @@ wrap_env envseq in
-            return @@ C.Build.let_ ~def ~ty
-                        ~body:(C.Bound1 { user = Some user; body; }) ()
+            return @@ C.Build.let_
+                        (C.Def { user = Some user;
+                                 body = Ann { body = def; ty; } })
+                        body
        in
        return @@ run ~eta:false ~free:0 @@ wrap_env (DeBruijn.Env.to_seq env)
 
@@ -337,11 +346,11 @@ module Quote = struct
        return @@ C.Build.pair left right
 
     | Type (Fin level) ->
-       return @@ C.Build.typ ~level ()
+       return @@ C.Build.typ level
 
     | Type Inf ->
-       return @@ C.Build.typ ~level:max_int ()
-       (* Error.internal "limit universe quotation" *)
+       (* We print omega, which cannot be reified, as max_int. *)
+       return @@ C.Build.typ max_int
 
     | Nat ->
        return @@ C.Build.nat ()

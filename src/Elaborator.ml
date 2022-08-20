@@ -123,11 +123,12 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
   fun ~expected (Position.{ value = r; position = loc; } as tm) ->
   let* () = on_check_pre ~expected tm in
   match r with
-  | Let { def; ty; body; } ->
-     check_def ~name:(bound1_name body) ~ty ~def
-       (fun ~ty ~def ->
-         let* body = check_bound1 ~expected body in
-         return @@ C.Build.let_ ~loc ~def ~ty ~body ())
+  | Let _ ->
+     assert false       (* TODO *)
+     (* check_def ~name:(bound1_name body) ~ty ~def *)
+     (*   (fun ~ty ~def -> *)
+     (*     let* body = check_bound1 ~expected body in *)
+     (*     return @@ C.Build.let_ ~loc ~def ~ty ~body ()) *)
 
   | Pi (a, f) | Sigma (a, f) ->
      let binder =
@@ -187,7 +188,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      begin match expected with
      | Type l_expected ->
         if !Options.type_in_type || L.(fin l_actual <= l_expected)
-        then return @@ C.Build.typ ~loc ~level:l_actual ()
+        then return @@ C.Build.typ ~loc l_actual
         else Error.universe_inconsistency loc
 
      | _ ->
@@ -273,7 +274,7 @@ and infer : R.term -> (C.term * S.ty) M.t =
 
     | Type i ->
        let level = i + 1 in
-       return @@ (C.Build.typ ~level (), S.Type L.(fin level))
+       return @@ (C.Build.typ level, S.Type L.(fin level))
 
     | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat ->
        Error.could_not_synthesize loc
@@ -298,8 +299,15 @@ and check_bound2 : expected:S.ty -> R.bound2 -> C.bound2 M.t =
                        user2 = Raw.name_option_of_pattern pat2;
                        body; }
 
-and check_def : 'a. name:Name.t -> ty:R.ty -> def:R.term ->
-                         (ty:C.ty -> def:C.term -> 'a M.t) -> 'a M.t =
+and check_def : 'a. R.def -> 'a M.t -> (C.def * 'a) M.t =
+  fun (R.Def { pat; args; body; }) k ->
+  let* body = telescope (fun arg  args (annot body) in
+  
+
+
+                (ty:C.ty -> def:C.term -> 'a M.t) -> 'a M.t =
+  
+
   fun ~name ~ty ~def k ->
   let* ty = check_is_ty ty in
   let* tysem = eval ty in
@@ -311,18 +319,19 @@ and check_def : 'a. name:Name.t -> ty:R.ty -> def:R.term ->
 let phrase : R.phrase -> C.t M.t -> C.t M.t =
   fun Position.{ value; position = loc; } file ->
   match value with
-  | Val { name; ty; def; } ->
-     check_def ~name ~ty ~def
-       (fun ~ty ~def ->
-         let* file = file in
-         return @@ C.Build.val_ ~loc ~user:name ~ty ~def () :: file)
+  | Val _ ->
+     assert false               (* TODO *)
+     (* check_def ~name ~args *)
+     (*   (fun ~ty ~def -> *)
+     (*     let* file = file in *)
+     (*     return @@ C.Build.val_ ~loc ~user:name ~ty ~def () :: file) *)
   | Eval { def; ty; } ->
      let* ty = check_is_ty ty in
      let* tysem = eval ty in
      let* def = check ~expected:tysem def in
      let* def = liftE @@ S.Conv.normalize ~ty:tysem ~tm:def in
      let* file = file in
-     return @@ C.Build.eval ~loc ~def ~ty () :: file
+     return @@ C.Build.eval ~loc def ty :: file
 
 let rec check = function
   | [] ->

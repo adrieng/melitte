@@ -25,7 +25,7 @@
 | LPAREN x = X RPAREN { x }
 
 %inline located(X):
-| x = X { x ~loc:(Position.lex_join $startpos $endpos) () }
+| x = X { x ?loc:(Some (Position.lex_join $startpos $endpos)) () }
 
 %inline name:
 | id = ID { id }
@@ -62,8 +62,8 @@ term_:
   { t }
 | LAM params = pattern+ DARR body = term
   { B.lam_n ~params ~body }
-| LET p = pattern COLON ty = ty EQ def = term IN body = term
-  { B.let_ ~def ~ty ~body:(B.bound1 p body) }
+| LET def = def IN body = term
+  { B.let_ ~def ~body }
 | FORALL params = parens(hyp)+ ARR body = ty
   { B.pi_n ~params ~body }
 | SIGMA params = parens(hyp)+ TIMES body = ty
@@ -102,14 +102,31 @@ pattern_:
 hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
-phrase_desc:
-| VAL name = name COLON ty = ty EQ def = term
-  { B.val_ ~name ~ty ~def }
+hypothesis_:
+| LPAREN bound = pattern COLON ty = ty RPAREN
+  { Build.hypothesis ~bound ~ty }
+
+%inline hypothesis:
+| located(hypothesis_) { $1 }
+
+telescope:
+| hypothesis+ { $1 }
+
+def_:
+| pat = pattern args = telescope COLON ty = ty EQ body = term
+  { B.def ~pat ~args ~ty ~body }
+
+%inline def:
+| located(def_) { $1 }
+
+phrase_:
+| VAL def = def
+  { B.val_ ~def }
 | EVAL def = term COLON ty = ty
   { B.eval ~def ~ty }
 
 %inline phrase:
-| p = located(phrase_desc) { p }
+| located(phrase_) { $1 }
 
 file:
 | xs = phrase* EOF { xs }

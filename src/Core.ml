@@ -2,7 +2,7 @@ open Sexplib.Std
 
 type term_desc =
   | Var of DeBruijn.Ix.t
-  | Let of { def : term; ty : term; body : bound1; }
+  | Let of def * term
   | Pi of term * bound1
   | Lam of bound1
   | App of term * term
@@ -27,6 +27,23 @@ and term =
     [@sexp_drop_if fun _ -> true]
   }
 
+and telescope = hypothesis list
+
+and hypothesis =
+  H of {
+      user : Name.t option; [@equal fun _ _ -> true]
+      ty : term;
+      loc : Position.t;
+      [@equal fun _ _ -> true]
+      [@sexp_drop_if fun _ -> true]
+    }
+
+and boundN =
+  BoundN of {
+      tele : telescope;
+      body : term;
+    }
+
 and bound1 =
   Bound1 of {
       body : term;
@@ -40,8 +57,20 @@ and bound2 =
       user2 : Name.t option; [@equal fun _ _ -> true]
     }
 
+and def =
+  Def of {
+      user : Name.t option; [@equal fun _ _ -> true]
+      body : annotated;
+    }
+
+and annotated =
+  Ann of {
+      body : term;
+      ty : term;
+    }
+
 and phrase_desc =
-  | Val of { user : Name.t option; ty : term; def : term; }
+  | Val of def
   | Eval of { def : term; ty : term; }
 
 and phrase =
@@ -103,11 +132,9 @@ module ToRaw = struct
       | Snd m ->
          let* m = term m in
          return @@ Raw.Snd m
-      | Let { def; ty; body; } ->
-         let* def = term def in
-         let* ty = term ty in
-         let* body = bound1 body in
-         return @@ Raw.Let { def; ty; body; }
+      | Let (d, body) ->
+         let* d, body = def d (term body) in
+         return @@ Raw.Let (d, body)
       | Type l ->
          return @@ Raw.Type l
       | Nat ->
@@ -136,42 +163,62 @@ module ToRaw = struct
     let$ pat2 = user2 in
     let* body = term body in
     return @@ Raw.Bound2 { pat1; pat2; body; }
-  ;;
 
-  let phrase { ph_desc; ph_loc; } =
-    let* desc, env =
+  and boundN (BoundN { tele; body; }) =
+    let* tele, body = telescope tele (term body) in
+    return @@ Raw.BoundN { tele; body; }
+
+  and telescope : 'a. telescope -> 'a M.t -> (Raw.telescope * 'a) M.t =
+    fun tele k ->
+    match tele with
+    | [] ->
+       let* final = k in
+       return ([], final)
+    | H { user; ty; loc; } :: tele ->
+       let* ty = term ty in
+       let$ bound = user in
+       let* tele, res = telescope tele k in
+       return @@ (Position.with_pos loc (Raw.H { bound; ty; }) :: tele, res)
+
+  and annot (Ann { ty; body; }) =
+    let* ty = term ty in
+    let* body = term body in
+    return @@ Raw.Ann { ty; body; }
+
+  and def : 'a. def -> 'a M.t -> (Raw.def * 'a) M.t =
+    fun (Def { user; body; }) k ->
+    let* body = annot body in
+    let$ pat = user in
+    let* res = k in
+    return (Raw.Def { pat; args = []; body; }, res)
+
+  let phrase { ph_desc; ph_loc; } file =
+    let* desc, file =
       match ph_desc with
-      | Val { user; ty; def; } ->
-         let name = Name.of_option user in
-         let* def = term def in
-         let* ty = term ty in
-         let* env = M.get in
-         return (Raw.Val { name; ty; def; }, DeBruijn.Env.extend name env)
+      | Val d ->
+         let* def, file = def d file in
+         return (Raw.Val def, file)
       | Eval { ty; def; } ->
          let* ty = term ty in
          let* def = term def in
-         let* env = M.get in
-         return (Raw.Eval { ty; def; }, env)
+         let* file = file in
+         return (Raw.Eval { ty; def; }, file)
     in
-    return @@ (Position.with_pos ph_loc desc, env)
+    return @@ Position.with_pos ph_loc desc :: file
 
-  let file file env =
-    let file, _ =
-      List.fold_left
-        (fun (file, env) ph -> let ph, env = phrase ph env in ph :: file, env)
-        ([], env)
-        file
-    in
-    List.rev file
+  let file file =
+    List.fold_right phrase file (return [])
 end
 
 module Build = struct
+  type 'a locator = ?loc:Position.t -> 'a
+
   let desc ?loc t_desc =
     { t_desc; t_loc = Option.value ~default:Position.dummy loc; }
 
   let var ?loc ix = desc ?loc @@ Var ix
 
-  let let_ ?loc ~def ~ty ~body () = desc ?loc @@ Let { def; ty; body; }
+  let let_ ?loc def body = desc ?loc @@ Let (def, body)
 
   let pi ?loc a f = desc ?loc @@ Pi (a, f)
 
@@ -196,12 +243,12 @@ module Build = struct
   let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
     desc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
-  let typ ?loc ~level () = desc ?loc @@ Type level
+  let typ ?loc level = desc ?loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ?user ~ty ~def () =
-    { ph_loc = loc; ph_desc = Val { user; ty; def; } }
+  let val_ ?(loc = Position.dummy) def =
+    { ph_loc = loc; ph_desc = Val def; }
 
-  let eval ?(loc = Position.dummy) ~ty ~def () =
+  let eval ?(loc = Position.dummy) ty def =
     { ph_loc = loc; ph_desc = Eval { def; ty; } }
 end
 

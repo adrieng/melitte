@@ -6,7 +6,7 @@ and pattern = pattern_desc Position.located
 
 type term_desc =
   | Var of Name.t
-  | Let of { def : term; ty : ty; body : bound1; }
+  | Let of def * term
   | Pi of ty * bound1
   | Lam of bound1
   | App of term * term
@@ -25,6 +25,22 @@ type term_desc =
 
 and term = term_desc Position.located
 
+and telescope = hypothesis list
+
+and hypothesis_desc =
+  H of {
+      bound : pattern;
+      ty : term;
+    }
+
+and hypothesis = hypothesis_desc Position.located
+
+and boundN =
+  BoundN of {
+      tele : telescope;
+      body : term;
+    }
+
 and bound1 =
   Bound1 of {
       pat : pattern;
@@ -40,8 +56,21 @@ and bound2 =
 
 and ty = term
 
+and def =
+  Def of {
+      pat : pattern;
+      args : telescope;
+      body : annotated;
+    }
+
+and annotated =
+  Ann of {
+      body : term;
+      ty : ty;
+    }
+
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; def : term; }
+  | Val of def
   | Eval of { def : term; ty : ty; }
 
 and phrase = phrase_desc Position.located
@@ -49,7 +78,9 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build = struct
-  let pvar ?(loc = Position.dummy) ~name () =
+  type 'a builder = ?loc:Position.t -> unit -> 'a
+
+  let pvar ~name ?(loc = Position.dummy) () =
     Position.with_pos loc @@ PVar name
 
   let pwildcard ?(loc = Position.dummy) () =
@@ -61,13 +92,13 @@ module Build = struct
   let bound2 pat1 pat2 body =
     Bound2 { pat1; pat2; body; }
 
-  let var ?(loc = Position.dummy) ~name () =
+  let var ~name ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Var name
 
-  let let_ ?(loc = Position.dummy) ~def ~ty ~body () =
-    Position.with_pos loc @@ Let { def; ty; body; }
+  let let_ ~def ~body ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ Let (def, body)
 
-  let binder_n ?(loc = Position.dummy) ~binder ~params ~body () =
+  let binder_n ~binder ~params ~body ?(loc = Position.dummy) () =
     Position.{
         (List.fold_right
            (fun (p, a) b ->
@@ -76,43 +107,43 @@ module Build = struct
       with position = loc;
     }
 
-  let pi ?(loc = Position.dummy) ~dom ~cod () =
+  let pi ~dom ~cod ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Pi (dom, cod)
 
   let pi_n =
     binder_n ~binder:(fun dom cod -> Pi (dom, cod))
 
-  let arrow ?(loc = Position.dummy) ~dom ~cod () =
+  let arrow ~dom ~cod ?(loc = Position.dummy) () =
     pi ~loc ~dom ~cod:(bound1 (pwildcard ~loc ()) cod) ()
 
-  let lam ?(loc = Position.dummy) ~param ~body () =
+  let lam ~param ~body ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Lam (bound1 param body)
 
-  let lam_n ?(loc = Position.dummy) ~params ~body () =
+  let lam_n ~params ~body ?(loc = Position.dummy) () =
     List.fold_right (fun param body -> lam ~loc ~param ~body ()) params body
 
-  let app ?(loc = Position.dummy) ~func ~arg () =
+  let app ~func ~arg ?(loc = Position.dummy) () =
     Position.with_pos loc @@ App (func, arg)
 
-  let app_n ?(loc = Position.dummy) ~func ~args () =
+  let app_n ~func ~args ?(loc = Position.dummy) () =
     List.fold_left (fun func arg -> app ~loc ~func ~arg ()) func args
 
-  let sigma ?(loc = Position.dummy) ~base ~total () =
+  let sigma ~base ~total ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Sigma (base, total)
 
   let sigma_n =
     binder_n ~binder:(fun dom cod -> Sigma (dom, cod))
 
-  let product ?(loc = Position.dummy) ~left ~right () =
+  let product ~left ~right ?(loc = Position.dummy) () =
     sigma ~loc ~base:left ~total:(bound1 (pwildcard ~loc ()) right) ()
 
-  let pair ?(loc = Position.dummy) ~left ~right () =
+  let pair ~left ~right ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Pair (left, right)
 
-  let fst ?(loc = Position.dummy) ~arg () =
+  let fst ~arg ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Fst arg
 
-  let snd ?(loc = Position.dummy) ~arg () =
+  let snd ~arg ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Snd arg
 
   let nat ?(loc = Position.dummy) () =
@@ -121,23 +152,30 @@ module Build = struct
   let zero ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Zero
 
-  let suc ?(loc = Position.dummy) ~t () =
+  let suc ~t ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Suc t
 
-  let lit ?(loc = Position.dummy) ~k () =
+  let lit ~k ?(loc = Position.dummy) () =
     Sigs.Int.fold (fun t -> suc ~loc ~t ()) k (zero ~loc ())
 
-  let natelim ?(loc = Position.dummy) ~scrut ~motive ~case_zero ~case_suc () =
+  let natelim ~scrut ~motive ~case_zero ~case_suc ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
-  let typ ?(loc = Position.dummy) ~level () =
+  let typ ~level ?(loc = Position.dummy) () =
     if level < 0 then invalid_arg "typ";
     Position.with_pos loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ~name ~ty ~def () =
-    Position.with_pos loc @@ Val { name; ty; def; }
+  let hypothesis ~bound ~ty ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ H { bound; ty; }
 
-  let eval ?(loc = Position.dummy) ~ty ~def () =
+  let def ~pat ~args ~ty ~body ?(loc = Position.dummy) () =
+    ignore loc;
+    Def { pat; args; body = Ann { ty; body; }; }
+
+  let val_ ~def ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ Val def
+
+  let eval ~ty ~def ?(loc = Position.dummy) () =
     Position.with_pos loc @@ Eval { ty; def; }
 end
 
@@ -172,13 +210,8 @@ module PPrint = struct
          patterns
          (term_desc body)
 
-    | Let { def; ty; body = Bound1 { pat; body; }; } ->
-       group
-         (
-           (group (!^ "let" ^/^ hyp pat ty
-                   ^/^ !^ " =" ^/^ term def ^/^ !^ "in"))
-           ^/^ term body
-         )
+    | Let (d, body) ->
+       group @@ def "let" d ^^ space ^^ !^ "in" ^/^ term body
 
     | Pi (_, Bound1 { pat = { Position.value = PVar _; _ }; _ }) as t ->
        let rec print_forall = function
@@ -316,9 +349,21 @@ module PPrint = struct
   and hyp (p : pattern) ty =
     group (pattern p ^^ space ^^ colon ^/^ typ ty)
 
+  and def kw (Def { pat; args; body = Ann { ty; body; }; }) =
+    prefix 2 1
+      (!^ kw ^^ space ^^ pattern pat ^^ space ^^
+         group (telescope args ^/^ colon ^^ term ty ^^ space ^^ equals))
+      (term body)
+
+  and hypothesis hyp =
+    let H { bound; ty; } = Position.value hyp in
+    parens @@ group @@ pattern bound ^/^ colon ^^ space ^^ term ty
+
+  and telescope tele = separate_map (break 1) hypothesis tele
+
   and phrase_desc = function
-    | Val { name; ty; def; } ->
-       bindN (!^ "val") equals [hyp (Build.pvar ~name ()) ty] (term def)
+    | Val d ->
+       def "val" d
     | Eval { def; ty; } ->
        bindN (!^ "eval") colon [term def] (term ty)
 

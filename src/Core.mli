@@ -4,7 +4,7 @@
 
 type term_desc =
   | Var of DeBruijn.Ix.t
-  | Let of { def : term; ty : term; body : bound1; }
+  | Let of def * term
   | Pi of term * bound1
   | Lam of bound1
   | App of term * term
@@ -27,6 +27,21 @@ and term =
     t_loc : Position.position;
   }
 
+and telescope = hypothesis list
+
+and hypothesis =
+  H of {
+      user : Name.t option;
+      ty : term;
+      loc : Position.position;
+    }
+
+and boundN =
+  BoundN of {
+      tele : telescope;
+      body : term;
+    }
+
 and bound1 =
   Bound1 of {
       body : term;              (* term under binder *)
@@ -40,8 +55,20 @@ and bound2 =
       user2 : Name.t option;    (* for pretty-printing only *)
     }
 
+and def =
+  Def of {
+      user : Name.t option;     (* for pretty-printing only *)
+      body : annotated;
+    }
+
+and annotated =
+  Ann of {
+      body : term;
+      ty : term;
+    }
+
 and phrase_desc =
-  | Val of { user : Name.t option; ty : term; def : term; }
+  | Val of def
   | Eval of { def : term; ty : term; }
 
 and phrase =
@@ -63,41 +90,27 @@ val sexp_of_t : t -> Sexplib.Sexp.t
 val equal_term : term -> term -> bool
 
 module Build : sig
-  val var : ?loc:Position.t -> DeBruijn.Ix.t -> term
-  val let_ : ?loc:Position.t ->
-             def:term ->
-             ty:term ->
-             body:bound1 ->
-             unit ->
-             term
-  val pi : ?loc:Position.t -> term -> bound1 -> term
-  val lam : ?loc:Position.t -> bound1 -> term
-  val app : ?loc:Position.t -> term -> term -> term
-  val sigma : ?loc:Position.t -> term -> bound1 -> term
-  val pair : ?loc:Position.t -> term -> term -> term
-  val fst : ?loc:Position.t -> term -> term
-  val snd : ?loc:Position.t -> term -> term
-  val nat : ?loc:Position.t -> unit -> term
-  val zero : ?loc:Position.t -> unit -> term
-  val suc : ?loc:Position.t -> term -> term
-  val natelim : ?loc:Position.t ->
-                scrut:term ->
-                motive:bound1 ->
-                case_zero:term ->
-                case_suc:bound2 ->
-                unit -> term
-  val typ : ?loc:Position.t -> level:int -> unit -> term
-  val val_ : ?loc:Position.t ->
-             ?user:Name.t ->
-             ty:ty ->
-             def:term ->
-             unit ->
-             phrase
-  val eval : ?loc:Position.t ->
-             ty:ty ->
-             def:term ->
-             unit ->
-             phrase
+  type 'a locator = ?loc:Position.t -> 'a
+  val var : (DeBruijn.Ix.t -> term) locator
+  val let_ : (def -> term -> term) locator
+  val pi : (term -> bound1 -> term) locator
+  val lam : (bound1 -> term) locator
+  val app : (term -> term -> term) locator
+  val sigma : (term -> bound1 -> term) locator
+  val pair : (term -> term -> term) locator
+  val fst : (term -> term) locator
+  val snd : (term -> term) locator
+  val nat : (unit -> term) locator
+  val zero : (unit -> term) locator
+  val suc : (term -> term) locator
+  val natelim : (scrut:term ->
+                 motive:bound1 ->
+                 case_zero:term ->
+                 case_suc:bound2 ->
+                 unit -> term) locator
+  val typ : (int -> term) locator
+  val val_ : (def -> phrase) locator
+  val eval : (ty -> term -> phrase) locator
 end
 
 module ToRaw : sig
@@ -106,7 +119,7 @@ module ToRaw : sig
   val term : term -> env -> Raw.term
   val bound1 : bound1 -> Raw.bound1 M.t
   val bound2 : bound2 -> Raw.bound2 M.t
-  val phrase : phrase -> (Raw.phrase * env) M.t
+  val boundN : boundN -> Raw.boundN M.t
   val file : t -> Raw.t M.t
 end
 
