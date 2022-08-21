@@ -68,7 +68,7 @@ module ToRaw = struct
     let name =
       match p with
       | Some name -> name
-      | None -> "_x" ^ string_of_int (DeBruijn.Env.width env)
+      | None -> Name.internal @@ string_of_int @@ DeBruijn.Env.width env
     in
     f (Raw.Build.pvar ~name ()) (DeBruijn.Env.extend name env)
 

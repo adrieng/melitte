@@ -1,7 +1,7 @@
 type error =
   | Internal of string
   | Syntax of Position.t * string
-  | Unbound_identifier of Position.t * string
+  | Unbound_identifier of Position.t * Name.t
   | Could_not_synthesize of Position.t
   | Incompatible_types of { loc : Position.t;
                        expected : PPrint.document;
@@ -21,8 +21,9 @@ let print fmt = function
   | Syntax (loc, s) ->
      Format.fprintf fmt "@[%s:@ %s@]" (Position.to_string loc) s
   | Unbound_identifier (loc, s) ->
-     Format.fprintf fmt "@[%s:@ unbound identifier %s@]"
-       (Position.to_string loc) s
+     Format.fprintf fmt "@[%s:@ unbound identifier %a@]"
+       (Position.to_string loc)
+       (ExtPrint.to_fmt Name.pp) s
   | Could_not_synthesize loc ->
      Format.fprintf fmt "@[%s:@ could not synthesize type (add annotation)@]"
        (Position.to_string loc)

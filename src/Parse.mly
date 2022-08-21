@@ -28,7 +28,7 @@
 | x = X { x ~loc:(Position.lex_join $startpos $endpos) () }
 
 %inline name:
-| id = ID { id }
+| id = ID { Name.of_string id }
 
 very_simple_term_:
 | name = name { B.var ~name }
@@ -94,7 +94,7 @@ bind2(SEP):
 
 pattern_:
 | UNDERSCORE { B.pwildcard }
-| name = ID { B.pvar ~name }
+| name = name { B.pvar ~name }
 
 %inline pattern:
 | located(pattern_) { $1 }

@@ -145,7 +145,7 @@ module PPrint = struct
   open PPrint
   module U = UnicodeSigil
 
-  let name = utf8string
+  let name = Name.pp
 
   let pattern_desc = function
     | PWildcard -> !^ "_"

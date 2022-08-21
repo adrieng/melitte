@@ -506,7 +506,7 @@ module PPrint = struct
     in
     group @@
       prefix 2 1
-        (prefix 2 1 (!^ user) (ty ^^ equals))
+        (prefix 2 1 (Name.pp user) (ty ^^ equals))
         (value def env)
       ^^ (if DeBruijn.Env.width env > 1 then semi ^^ space else empty)
       ^^ doc

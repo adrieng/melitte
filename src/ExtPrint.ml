@@ -1,3 +1,5 @@
+type 'a printer = 'a -> PPrint.document
+
 let ribbon = 1.0
 
 let width = 80

@@ -29,6 +29,7 @@ end
 
 module type PrintableComparableType = sig
   include PrintableType
+  include Map.OrderedType with type t := t
   val equal : t -> t -> bool
 end
 

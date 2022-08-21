@@ -36,8 +36,7 @@ type theory. Here are the ones I looked at:
 
 ### Foundations
 
-- inductive types (W-types, a universe of descriptions à la indexed
-  container gang?)
+- inductive types (W-types, a universe of descriptions à la McBride-Dagand?)
 - universe of definitionally-irrelevant propositions
 
 ### Engineering
