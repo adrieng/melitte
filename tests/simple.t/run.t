@@ -2,7 +2,7 @@
   {- Raw code -}
   val id : ∀ (A : 𝕌 0) → A → A = λ A x ⇒ x
   {- Elaborated code -}
-  val id : ∀ (A : 𝕌 0) (_x1 : A) → A = λ A x ⇒ x
+  val id : ∀ (A : 𝕌 0) (_1 : A) → A = λ A x ⇒ x
   $ melitte -v t2.melitte
   {- Raw code -}
   val c : ℕ → ℕ = λ n ⇒ n
@@ -13,13 +13,13 @@
     λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ 0 | suc _, r ⇒ add m r }
   eval mul 3 10 : ℕ
   {- Elaborated code -}
-  val c : ∀ (_x0 : ℕ) → ℕ = λ n ⇒ n
+  val c : ∀ (_0 : ℕ) → ℕ = λ n ⇒ n
   eval 1 : ℕ
-  val add : ∀ (_x1 : ℕ) (_x2 : ℕ) → ℕ =
-    λ n m ⇒ elim n with _x3 ⇒ ℕ { zero ⇒ m | suc _x3, r ⇒ suc r }
+  val add : ∀ (_1 : ℕ) (_2 : ℕ) → ℕ =
+    λ n m ⇒ elim n with _3 ⇒ ℕ { zero ⇒ m | suc _3, r ⇒ suc r }
   eval 7 : ℕ
-  val mul : ∀ (_x2 : ℕ) (_x3 : ℕ) → ℕ =
-    λ n m ⇒ elim n with _x4 ⇒ ℕ { zero ⇒ 0 | suc _x4, r ⇒ add m r }
+  val mul : ∀ (_2 : ℕ) (_3 : ℕ) → ℕ =
+    λ n m ⇒ elim n with _4 ⇒ ℕ { zero ⇒ 0 | suc _4, r ⇒ add m r }
   eval 30 : ℕ
   $ melitte -v t3.melitte
   File "t3.melitte", line 1, characters 19-20: syntax error
@@ -38,13 +38,13 @@
   {- Elaborated code -}
   val x : 𝕌 0 = ℕ
   val three : x = 3
-  val const : ∀ (_x2 : ℕ) → ℕ = λ x ⇒ 0
-  val id : ∀ (A : 𝕌 0) (_x4 : A) → A = λ A x ⇒ x
-  val iter : ∀ (A : 𝕌 0) (f : ∀ (_x5 : A) → A) (_x6 : A) (_x7 : ℕ) → A =
-    λ A f z n ⇒ elim n with _x8 ⇒ A { zero ⇒ z | suc _x8, r ⇒ f r }
-  val add : ∀ (_x5 : ℕ) (_x6 : ℕ) → ℕ = iter ℕ (λ n ⇒ suc n)
-  val mul : ∀ (_x6 : ℕ) (_x7 : ℕ) → ℕ = λ n ⇒ iter ℕ (add n) 0
-  val exp : ∀ (_x7 : ℕ) (_x8 : ℕ) → ℕ = λ n ⇒ iter ℕ (mul n) 1
+  val const : ∀ (_2 : ℕ) → ℕ = λ x ⇒ 0
+  val id : ∀ (A : 𝕌 0) (_4 : A) → A = λ A x ⇒ x
+  val iter : ∀ (A : 𝕌 0) (f : ∀ (_5 : A) → A) (_6 : A) (_7 : ℕ) → A =
+    λ A f z n ⇒ elim n with _8 ⇒ A { zero ⇒ z | suc _8, r ⇒ f r }
+  val add : ∀ (_5 : ℕ) (_6 : ℕ) → ℕ = iter ℕ (λ n ⇒ suc n)
+  val mul : ∀ (_6 : ℕ) (_7 : ℕ) → ℕ = λ n ⇒ iter ℕ (add n) 0
+  val exp : ∀ (_7 : ℕ) (_8 : ℕ) → ℕ = λ n ⇒ iter ℕ (mul n) 1
 
 Melitte contains a hierarchy of universes.
 
