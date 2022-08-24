@@ -6,7 +6,7 @@
   $ melitte -v t2.melitte
   {- Raw code -}
   val c : ℕ → ℕ = λ n ⇒ n
-  eval (suc c 0 : ℕ)
+  eval suc c 0
   val add : ℕ → ℕ → ℕ = λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ m | suc _, r ⇒ suc r }
   eval add 2 5
   val mul : ℕ → ℕ → ℕ =
