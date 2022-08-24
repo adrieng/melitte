@@ -52,7 +52,9 @@ end
 module Eval : sig
   module M : Monad.Plain with type 'a t = env -> 'a
 
-  val term : Core.term -> value M.t
+  val cterm : Core.cterm -> value M.t
+
+  val iterm : Core.iterm -> value M.t
 
   val clo1 : clo1 -> value -> value
 
@@ -80,23 +82,23 @@ module Quote : sig
       type [ty]. *)
   val fresh : ?user:Name.t -> ?def:value -> ty -> entry M.t
 
-  val normal : normal -> Core.term M.t
+  val normal : normal -> Core.cterm M.t
 
-  val typ : value -> Core.term M.t
+  val typ : value -> Core.cterm M.t
 
-  val neutral : neutral -> Core.term M.t
+  val neutral : neutral -> Core.iterm M.t
 
   (** [value] does not perform η-expansion, hence it should not be used when
       checking convertibility or, more generally, when performing normalization
       by evaluation. Nonetheless, it is useful, as it does not rely on typing
       information and can be used to print error messages in case of
       ill-typed.  *)
-  val value : value -> Core.term M.t
+  val value : value -> Core.cterm M.t
 end
 
 (** {2 Convertibility and normalization} *)
 
 module Conv : sig
   val ty : lo:value -> hi:value -> bool Quote.M.t
-  val normalize : ty:ty -> tm:Core.term -> Core.term Eval.M.t
+  val normalize : ty:ty -> tm:Core.cterm -> Core.cterm Eval.M.t
 end

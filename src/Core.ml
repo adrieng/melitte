@@ -1,48 +1,63 @@
 open Sexplib.Std
 
-type term_desc =
-  | Var of DeBruijn.Ix.t
-  | Let of { def : term; ty : term; body : bound1; }
-  | Pi of term * bound1
+type cterm_desc =
+  | Infer of iterm
+  | Let of { def : cterm; ty : cterm; body : bound1; }
+  | Pi of cterm * bound1
   | Lam of bound1
-  | App of term * term
-  | Sigma of term * bound1
-  | Pair of term * term
-  | Fst of term
-  | Snd of term
+  | Sigma of cterm * bound1
+  | Pair of cterm * cterm
   | Nat
   | Zero
-  | Suc of term
-  | Natelim of { scrut : term;
-                 motive : bound1;
-                 case_zero : term;
-                 case_suc : bound2; }
+  | Suc of cterm
   | Type of int
 
-and term =
+and cterm =
   {
-    t_desc : term_desc;
-    t_loc : Position.t;
+    c_desc : cterm_desc;
+    c_loc : Position.t;
+    [@equal fun _ _ -> true]
+    [@sexp_drop_if fun _ -> true]
+  }
+
+and iterm_desc =
+  | Var of DeBruijn.Ix.t
+  | App of iterm * cterm
+  | Fst of iterm
+  | Snd of iterm
+  | Natelim of { scrut : cterm;
+                 motive : bound1;
+                 case_zero : cterm;
+                 case_suc : bound2; }
+  | Annot of { tm : cterm; ty : cterm; }
+
+and iterm =
+  {
+    i_desc : iterm_desc;
+    i_loc : Position.t;
     [@equal fun _ _ -> true]
     [@sexp_drop_if fun _ -> true]
   }
 
 and bound1 =
   Bound1 of {
-      body : term;
-      user : Name.t option; [@equal fun _ _ -> true]
+      body : cterm;
+      user : Name.t option;
+      [@equal fun _ _ -> true]
     }
 
 and bound2 =
   Bound2 of {
-      body : term;
-      user1 : Name.t option; [@equal fun _ _ -> true]
-      user2 : Name.t option; [@equal fun _ _ -> true]
+      body : cterm;
+      user1 : Name.t option;
+      [@equal fun _ _ -> true]
+        user2 : Name.t option;
+      [@equal fun _ _ -> true]
     }
 
 and phrase_desc =
-  | Val of { user : Name.t option; ty : term; def : term; }
-  | Eval of { def : term; ty : term; }
+  | Val of { user : Name.t option; def : iterm; }
+  | Eval of { def : iterm; }
 
 and phrase =
   {
@@ -54,7 +69,7 @@ and phrase =
 
 and t = phrase list [@@deriving sexp_of, eq]
 
-type ty = term
+type ty = cterm
 
 module ToRaw = struct
   type env = Name.t DeBruijn.Env.t
@@ -72,40 +87,30 @@ module ToRaw = struct
     in
     f (Raw.Build.pvar ~name ()) (DeBruijn.Env.extend name env)
 
-  let rec term { t_desc; t_loc; } =
+  let rec cterm { c_desc; c_loc; } =
     let* desc =
-      match t_desc with
-      | Var ix ->
-         let* x = DeBruijn.Env.lookup ix in
-         return @@ Raw.Var x
+      match c_desc with
+      | Infer tm ->
+         let* tm = iterm tm in
+         return @@ Position.value tm
       | Lam b ->
          let* b = bound1 b in
          return @@ Raw.Lam b
-      | App (t, u) ->
-         let* t = term t in
-         let* u = term u in
-         return @@ Raw.App (t, u)
       | Pi (a, f) ->
-         let* a = term a in
+         let* a = cterm a in
          let* f = bound1 f in
          return @@ Raw.Pi (a, f)
       | Sigma (a, f) ->
-         let* a = term a in
+         let* a = cterm a in
          let* f = bound1 f in
          return @@ Raw.Sigma (a, f)
       | Pair (l, r) ->
-         let* l = term l in
-         let* r = term r in
+         let* l = cterm l in
+         let* r = cterm r in
          return @@ Raw.Pair (l, r)
-      | Fst m ->
-         let* m = term m in
-         return @@ Raw.Fst m
-      | Snd m ->
-         let* m = term m in
-         return @@ Raw.Snd m
       | Let { def; ty; body; } ->
-         let* def = term def in
-         let* ty = term ty in
+         let* def = cterm def in
+         let* ty = cterm ty in
          let* body = bound1 body in
          return @@ Raw.Let { def; ty; body; }
       | Type l ->
@@ -115,43 +120,65 @@ module ToRaw = struct
       | Zero ->
          return Raw.Zero
       | Suc t ->
-         let* t = term t in
+         let* t = cterm t in
          return @@ Raw.Suc t
+    in
+    return @@ Position.with_pos c_loc desc
+
+  and iterm { i_desc; i_loc; } =
+    let* desc =
+      match i_desc with
+      | Var ix ->
+         let* x = DeBruijn.Env.lookup ix in
+         return @@ Raw.Var x
+      | App (t, u) ->
+         let* t = iterm t in
+         let* u = cterm u in
+         return @@ Raw.App (t, u)
+      | Fst m ->
+         let* m = iterm m in
+         return @@ Raw.Fst m
+      | Snd m ->
+         let* m = iterm m in
+         return @@ Raw.Snd m
       | Natelim { scrut; motive; case_zero; case_suc; } ->
-         let* scrut = term scrut in
+         let* scrut = cterm scrut in
          let* motive = bound1 motive in
-         let* case_zero = term case_zero in
+         let* case_zero = cterm case_zero in
          let* case_suc = bound2 case_suc in
          return @@ Raw.Natelim { scrut; motive; case_zero; case_suc; }
+      | Annot { tm; ty; } ->
+         let* tm = cterm tm in
+         let* ty = cterm ty in
+         return @@ Raw.Annot { tm; ty; }
     in
-    return @@ Position.with_pos t_loc desc
+    return @@ Position.with_pos i_loc desc
 
   and bound1 (Bound1 { body; user; }) =
     let$ pat = user in
-    let* body = term body in
+    let* body = cterm body in
     return @@ Raw.Bound1 { pat; body; }
 
   and bound2 (Bound2 { body; user1; user2; }) =
     let$ pat1 = user1 in
     let$ pat2 = user2 in
-    let* body = term body in
+    let* body = cterm body in
     return @@ Raw.Bound2 { pat1; pat2; body; }
   ;;
 
   let phrase { ph_desc; ph_loc; } =
     let* desc, env =
       match ph_desc with
-      | Val { user; ty; def; } ->
+      | Val { user; def; } ->
          let name = Name.of_option user in
-         let* def = term def in
-         let* ty = term ty in
+         let* def = iterm def in
          let* env = M.get in
-         return (Raw.Val { name; ty; def; }, DeBruijn.Env.extend name env)
-      | Eval { ty; def; } ->
-         let* ty = term ty in
-         let* def = term def in
+         return (Raw.Val { name; ty = None; def; },
+                 DeBruijn.Env.extend name env)
+      | Eval { def; } ->
+         let* def = iterm def in
          let* env = M.get in
-         return (Raw.Eval { ty; def; }, env)
+         return (Raw.Eval { def; }, env)
     in
     return @@ (Position.with_pos ph_loc desc, env)
 
@@ -166,43 +193,51 @@ module ToRaw = struct
 end
 
 module Build = struct
-  let desc ?loc t_desc =
-    { t_desc; t_loc = Option.value ~default:Position.dummy loc; }
+  let cdesc ?loc c_desc =
+    { c_desc; c_loc = Option.value ~default:Position.dummy loc; }
 
-  let var ?loc ix = desc ?loc @@ Var ix
+  let idesc ?loc i_desc =
+    { i_desc; i_loc = Option.value ~default:Position.dummy loc; }
 
-  let let_ ?loc ~def ~ty ~body () = desc ?loc @@ Let { def; ty; body; }
+  let infer ?loc tm = cdesc ?loc @@ Infer tm
 
-  let pi ?loc a f = desc ?loc @@ Pi (a, f)
+  let let_ ?loc ~def ~ty ~body () = cdesc ?loc @@ Let { def; ty; body; }
 
-  let lam ?loc bound = desc ?loc @@ Lam bound
+  let pi ?loc a f = cdesc ?loc @@ Pi (a, f)
 
-  let app ?loc t u = desc ?loc @@ App (t, u)
+  let lam ?loc bound = cdesc ?loc @@ Lam bound
 
-  let sigma ?loc a f = desc ?loc @@ Sigma (a, f)
+  let sigma ?loc a f = cdesc ?loc @@ Sigma (a, f)
 
-  let pair ?loc left right = desc ?loc @@ Pair (left, right)
+  let pair ?loc left right = cdesc ?loc @@ Pair (left, right)
 
-  let fst ?loc arg = desc ?loc @@ Fst arg
+  let nat ?loc () = cdesc ?loc Nat
 
-  let snd ?loc arg = desc ?loc @@ Snd arg
+  let zero ?loc () = cdesc ?loc Zero
 
-  let nat ?loc () = desc ?loc Nat
+  let suc ?loc t = cdesc ?loc @@ Suc t
 
-  let zero ?loc () = desc ?loc Zero
+  let typ ?loc ~level () = cdesc ?loc @@ Type level
 
-  let suc ?loc t = desc ?loc @@ Suc t
+  let var ?loc ix = idesc ?loc @@ Var ix
+
+  let app ?loc t u = idesc ?loc @@ App (t, u)
+
+  let fst ?loc arg = idesc ?loc @@ Fst arg
+
+  let snd ?loc arg = idesc ?loc @@ Snd arg
 
   let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
-    desc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
+    idesc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
-  let typ ?loc ~level () = desc ?loc @@ Type level
+  let annot ?loc ~tm ~ty () =
+    idesc ?loc @@ Annot { tm; ty; }
 
-  let val_ ?(loc = Position.dummy) ?user ~ty ~def () =
-    { ph_loc = loc; ph_desc = Val { user; ty; def; } }
+  let val_ ?(loc = Position.dummy) ?user ~def () =
+    { ph_loc = loc; ph_desc = Val { user; def; } }
 
-  let eval ?(loc = Position.dummy) ~ty ~def () =
-    { ph_loc = loc; ph_desc = Eval { def; ty; } }
+  let eval ?(loc = Position.dummy) ~def () =
+    { ph_loc = loc; ph_desc = Eval { def; } }
 end
 
 module PPrint = struct

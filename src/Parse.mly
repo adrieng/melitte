@@ -80,6 +80,8 @@ term_:
   { B.natelim ~scrut ~motive ~case_zero ~case_suc }
 | LPAREN left = term COMMA right = term RPAREN
   { B.pair ~left ~right }
+| LPAREN tm = term COLON ty = ty RPAREN
+  { B.annot ~tm ~ty }
 
 %inline term:
 | located(term_) { $1 }
@@ -102,11 +104,14 @@ pattern_:
 hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
+annot:
+| COLON ty = ty { ty }
+
 phrase_desc:
-| VAL name = name COLON ty = ty EQ def = term
-  { B.val_ ~name ~ty ~def }
-| EVAL def = term COLON ty = ty
-  { B.eval ~def ~ty }
+| VAL name = name ty = option(annot) EQ def = term
+  { B.val_ ~name ?ty ~def }
+| EVAL def = term
+  { B.eval ~def }
 
 %inline phrase:
 | p = located(phrase_desc) { p }

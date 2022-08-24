@@ -22,6 +22,7 @@ type term_desc =
                  case_zero : term;
                  case_suc : bound2; }
   | Type of int
+  | Annot of { tm : term; ty : term; }
 
 and term = term_desc Position.located
 
@@ -41,8 +42,8 @@ and bound2 =
 and ty = term
 
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; def : term; }
-  | Eval of { def : term; ty : ty; }
+  | Val of { name : Name.t; ty : ty option; def : term; }
+  | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
 
@@ -130,15 +131,18 @@ module Build = struct
   let natelim ?(loc = Position.dummy) ~scrut ~motive ~case_zero ~case_suc () =
     Position.with_pos loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
+  let annot ?(loc = Position.dummy) ~tm ~ty () =
+    Position.with_pos loc @@ Annot { tm; ty; }
+
   let typ ?(loc = Position.dummy) ~level () =
     if level < 0 then invalid_arg "typ";
     Position.with_pos loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ~name ~ty ~def () =
+  let val_ ?(loc = Position.dummy) ~name ?ty ~def () =
     Position.with_pos loc @@ Val { name; ty; def; }
 
-  let eval ?(loc = Position.dummy) ~ty ~def () =
-    Position.with_pos loc @@ Eval { ty; def; }
+  let eval ?(loc = Position.dummy) ~def () =
+    Position.with_pos loc @@ Eval { def; }
 end
 
 module PPrint = struct
@@ -175,7 +179,7 @@ module PPrint = struct
     | Let { def; ty; body = Bound1 { pat; body; }; } ->
        group
          (
-           (group (!^ "let" ^/^ hyp pat ty
+           (group (!^ "let" ^/^ hyp ~ty pat
                    ^/^ !^ " =" ^/^ term def ^/^ !^ "in"))
            ^/^ term body
          )
@@ -184,7 +188,7 @@ module PPrint = struct
        let rec print_forall = function
          | Pi (a, Bound1 { pat = { Position.value = PVar _; _ } as pat;
                                body; }) ->
-            parens (hyp pat a) ^/^ print_forall body.Position.value
+            parens (hyp ~ty:a pat) ^/^ print_forall body.Position.value
          | t ->
             U.(doc srarrow) ^/^ typ_desc t
        in
@@ -204,7 +208,7 @@ module PPrint = struct
        let rec print_forall = function
          | Sigma (a, Bound1 { pat = { Position.value = PVar _; _ } as pat;
                                body; }) ->
-            parens (hyp pat a) ^/^ print_forall body.Position.value
+            parens (hyp ~ty:a pat) ^/^ print_forall body.Position.value
          | t ->
             dot ^/^ typ_desc t
        in
@@ -232,6 +236,10 @@ module PPrint = struct
 
     | Pair (left, right) ->
        parens @@ group @@ term left ^^ comma ^/^ term right
+
+    | Annot { tm; ty; } ->
+       (* TODO factor into some `hypothesis` function. *)
+       parens @@ group @@ term tm ^^ space ^^ colon ^/^ term ty
 
   and simple_term_desc = function
     | (Var _ | Type _ | Nat | Zero | Suc _ | Fst _ | Snd _) as t ->
@@ -313,14 +321,16 @@ module PPrint = struct
   and bound2 (Bound2 { pat1; pat2; body; }) =
     parens (group (pattern pat1 ^^ comma ^/^ pattern pat2)) ^^ dot ^^ term body
 
-  and hyp (p : pattern) ty =
-    group (pattern p ^^ space ^^ colon ^/^ typ ty)
+  and hyp ?ty (p : pattern) =
+    match ty with
+    | None -> pattern p
+    | Some ty -> group @@ pattern p ^^ space ^^ colon ^/^ typ ty
 
   and phrase_desc = function
     | Val { name; ty; def; } ->
-       bindN (!^ "val") equals [hyp (Build.pvar ~name ()) ty] (term def)
-    | Eval { def; ty; } ->
-       bindN (!^ "eval") colon [term def] (term ty)
+       bindN (!^ "val") equals [hyp ?ty (Build.pvar ~name ())] (term def)
+    | Eval { def; } ->
+       prefix 2 1 (!^ "eval") (term def)
 
   and phrase p = Position.located phrase_desc p
 

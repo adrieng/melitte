@@ -106,11 +106,16 @@ let unexpected_head_constr ~expected ~actual loc =
   let* actual = liftE @@ S.PPrint.value actual in
   Error.unexpected_head_constr ~expected ~actual loc
 
+let quote_ty tysem =
+  let open S.Quote in
+  liftE @@ lift @@ typ tysem
+
 let fresh ?def ~ty user =
   let open S.Quote in
   liftE @@ lift @@ fresh ~user ?def ty
 
-let eval tm = liftE @@ S.Eval.term tm
+let ceval tm = liftE @@ S.Eval.cterm tm
+let ieval tm = liftE @@ S.Eval.iterm tm
 
 let check_conv ~expected ~actual loc =
   let* () = on_conversion_pre ~expected ~actual loc in
@@ -119,7 +124,7 @@ let check_conv ~expected ~actual loc =
   then on_conversion_post ~expected ~actual loc
   else incompatible_types ~expected ~actual loc
 
-let rec check : expected:S.ty -> R.term -> C.term M.t =
+let rec check : expected:S.ty -> R.term -> C.cterm M.t =
   fun ~expected (Position.{ value = r; position = loc; } as tm) ->
   let* () = on_check_pre ~expected tm in
   match r with
@@ -139,7 +144,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      | S.Type _ ->
         let* a = check ~expected a in
         let* f =
-          let* asem = eval a in
+          let* asem = ceval a in
           let$ _ = fresh ~ty:asem (bound1_name f) in
           check_bound1 ~expected f
         in
@@ -165,7 +170,7 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
      | Sigma (a, f) ->
         let* left = check ~expected:a left in
         let* right =
-          let* leftsem = eval left in
+          let* leftsem = ceval left in
           check ~expected:(S.Eval.clo1 f leftsem) right
         in
         return @@ C.Build.pair ~loc left right
@@ -195,15 +200,34 @@ let rec check : expected:S.ty -> R.term -> C.term M.t =
 
      end
 
-  | Var _ | App _ | Zero | Suc _ | Natelim _ | Fst _ | Snd _ ->
+  | Zero ->
+     begin match expected with
+     | Nat ->
+        return @@ C.Build.zero ~loc ()
+
+     | actual ->
+        unexpected_head_constr ~expected:`Nat ~actual loc
+     end
+
+  | Suc m ->
+     begin match expected with
+     | Nat ->
+        let* m = check ~expected m in
+        return @@ C.Build.suc ~loc m
+
+     | actual ->
+        unexpected_head_constr ~expected:`Nat ~actual loc
+     end
+
+  | Var _ | App _ | Natelim _ | Fst _ | Snd _ | Annot _ ->
      let* tm, actual = infer tm in
      let* () = check_conv ~expected ~actual loc in
-     return tm
+     return @@ C.Build.infer ~loc tm
 
 and check_is_ty : R.ty -> C.ty M.t =
   fun tm -> check ~expected:S.limtype tm
 
-and infer : R.term -> (C.term * S.ty) M.t =
+and infer : R.term -> (C.iterm * S.ty) M.t =
   fun (Position.{ value = r; position = loc; } as tm) ->
   let* () = on_infer_pre tm in
   let* tm', ty =
@@ -217,40 +241,33 @@ and infer : R.term -> (C.term * S.ty) M.t =
        begin match mty with
        | Pi (a, f) ->
           let* n = check ~expected:a n in
-          let* nsem = eval n in
-          return @@ (C.Build.app m n, S.Eval.clo1 f nsem)
+          let* nsem = ceval n in
+          return @@ (C.Build.app ~loc m n, S.Eval.clo1 f nsem)
 
        | actual ->
-          unexpected_head_constr ~expected:`Pi ~actual m.C.t_loc
+          unexpected_head_constr ~expected:`Pi ~actual loc
        end
 
     | Fst m ->
        let* m, mty = infer m in
        begin match mty with
        | Sigma (a, _) ->
-          return @@ (C.Build.fst m, a)
+          return @@ (C.Build.fst ~loc m, a)
 
        | actual ->
-          unexpected_head_constr ~expected:`Sigma ~actual m.C.t_loc
+          unexpected_head_constr ~expected:`Sigma ~actual m.C.i_loc
        end
 
     | Snd m ->
        let* m, mty = infer m in
        begin match mty with
        | Sigma (_, f) ->
-          let* msem = eval m in
-          return @@ (C.Build.snd m, S.Eval.(clo1 f (fst msem)))
+          let* msem = ieval m in
+          return @@ (C.Build.snd ~loc m, S.Eval.(clo1 f (fst msem)))
 
        | actual ->
-          unexpected_head_constr ~expected:`Sigma ~actual m.C.t_loc
+          unexpected_head_constr ~expected:`Sigma ~actual m.C.i_loc
        end
-
-    | Zero ->
-       return @@ (C.Build.zero ~loc (), S.Nat)
-
-    | Suc m ->
-       let* m = check ~expected:Nat m in
-       return @@ (C.Build.suc ~loc m, S.Nat)
 
     | Natelim { scrut; motive; case_zero; case_suc; } ->
        let* scrut = check ~expected:Nat scrut in
@@ -266,16 +283,19 @@ and infer : R.term -> (C.term * S.ty) M.t =
          check_bound2 ~expected:(S.Eval.clo1 motsem (Suc x1)) case_suc
        in
        let* resty =
-         let* scrutsem = eval scrut in
+         let* scrutsem = ceval scrut in
          return @@ S.Eval.clo1 motsem scrutsem
        in
-       return @@ (C.Build.natelim ~scrut ~motive ~case_zero ~case_suc (), resty)
+       return @@ (C.Build.natelim ~loc ~scrut ~motive ~case_zero ~case_suc (),
+                  resty)
 
-    | Type i ->
-       let level = i + 1 in
-       return @@ (C.Build.typ ~level (), S.Type L.(fin level))
+    | Annot { tm; ty; } ->
+       let* ty = check_is_ty ty in
+       let* expected = ceval ty in
+       let* tm = check ~expected tm in
+       return @@ (C.Build.annot ~loc ~ty ~tm (), expected)
 
-    | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat ->
+    | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat | Type _ | Zero | Suc _ ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in
@@ -298,13 +318,22 @@ and check_bound2 : expected:S.ty -> R.bound2 -> C.bound2 M.t =
                        user2 = Raw.name_option_of_pattern pat2;
                        body; }
 
-and check_def : 'a. name:Name.t -> ty:R.ty -> def:R.term ->
-                         (ty:C.ty -> def:C.term -> 'a M.t) -> 'a M.t =
-  fun ~name ~ty ~def k ->
-  let* ty = check_is_ty ty in
-  let* tysem = eval ty in
-  let* def = check ~expected:tysem def in
-  let* defsem = eval def in
+and check_def : 'a. name:Name.t -> ?ty:R.ty -> def:R.term ->
+                         (ty:C.ty -> def:C.cterm -> 'a M.t) -> 'a M.t =
+  fun ~name ?ty ~def k ->
+  let* ty, tysem, def =
+    match ty with
+    | Some ty ->
+       let* ty = check_is_ty ty in
+       let* tysem = ceval ty in
+       let* def = check ~expected:tysem def in
+       return (ty, tysem, def)
+    | None ->
+       let* def, tysem = infer def in
+       let* ty = quote_ty tysem in
+       return (ty, tysem, C.Build.infer def)
+  in
+  let* defsem = ceval def in
   let$ _ = fresh ~def:defsem ~ty:tysem name in
   k ~ty ~def
 
@@ -312,17 +341,17 @@ let phrase : R.phrase -> C.t M.t -> C.t M.t =
   fun Position.{ value; position = loc; } file ->
   match value with
   | Val { name; ty; def; } ->
-     check_def ~name ~ty ~def
+     check_def ~name ?ty ~def
        (fun ~ty ~def ->
          let* file = file in
-         return @@ C.Build.val_ ~loc ~user:name ~ty ~def () :: file)
-  | Eval { def; ty; } ->
-     let* ty = check_is_ty ty in
-     let* tysem = eval ty in
-     let* def = check ~expected:tysem def in
-     let* def = liftE @@ S.Conv.normalize ~ty:tysem ~tm:def in
+         let def = C.Build.annot ~tm:def ~ty () in
+         return @@ C.Build.val_ ~loc ~user:name ~def () :: file)
+  | Eval { def; } ->
+     let* def, tysem = infer def in
+     let* def = liftE @@ S.Conv.normalize ~ty:tysem ~tm:(C.Build.infer def) in
+     let* ty = quote_ty tysem in
      let* file = file in
-     return @@ C.Build.eval ~loc ~def ~ty () :: file
+     return @@ C.Build.eval ~loc ~def:(C.Build.annot ~tm:def ~ty ()) () :: file
 
 let rec check = function
   | [] ->

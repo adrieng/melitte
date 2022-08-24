@@ -58,51 +58,33 @@ module Eval = struct
   let extend_eval ?(user = Name.dummy) def env =
     DeBruijn.Env.extend { def; ty = None; user; } env
 
-  let rec term : C.term -> value M.t =
-    fun t ->
-    match t.t_desc with
-    | C.Var ix ->
-       begin
-         try
-           let* entry = DeBruijn.Env.lookup ix in
-           return entry.def
-         with Not_found -> Error.internal "ill-scoped evaluation"
-       end
+  let rec cterm : C.cterm -> value M.t =
+    fun tm ->
+    match tm.c_desc with
+    | C.Infer tm ->
+       iterm tm
 
     | C.Lam body ->
        let* body = close1 body in
        return @@ Lam body
 
-    | C.App (t, u) ->
-       let* t = term t in
-       let* u = term u in
-       return @@ app t u
-
     | C.Pi (dom, cod) ->
-       let* dom = term dom in
+       let* dom = cterm dom in
        let* cod = close1 cod in
        return @@ Pi (dom, cod)
 
     | C.Sigma (dom, cod) ->
-       let* dom = term dom in
+       let* dom = cterm dom in
        let* cod = close1 cod in
        return @@ Sigma (dom, cod)
 
     | C.Pair (left, right) ->
-       let* left = term left in
-       let* right = term right in
+       let* left = cterm left in
+       let* right = cterm right in
        return @@ Pair (left, right)
 
-    | C.Fst t ->
-       let* t = term t in
-       return @@ fst t
-
-    | C.Snd t ->
-       let* t = term t in
-       return @@ snd t
-
     | C.Let { def; body; _ } ->
-       let* def = term def in
+       let* def = cterm def in
        let* body = close1 body in
        return @@ clo1 body def
 
@@ -116,15 +98,42 @@ module Eval = struct
        return Zero
 
     | C.Suc t ->
-       let* t = term t in
+       let* t = cterm t in
        return @@ Suc t
 
+  and iterm : C.iterm -> value M.t =
+    fun tm ->
+    match tm.i_desc with
+    | C.Var ix ->
+       begin
+         try
+           let* entry = DeBruijn.Env.lookup ix in
+           return entry.def
+         with Not_found -> Error.internal "ill-scoped evaluation"
+       end
+
+    | C.App (t, u) ->
+       let* t = iterm t in
+       let* u = cterm u in
+       return @@ app t u
+
+    | C.Fst t ->
+       let* t = iterm t in
+       return @@ fst t
+
+    | C.Snd t ->
+       let* t = iterm t in
+       return @@ snd t
+
     | C.Natelim { scrut; motive; case_zero; case_suc; } ->
-       let* scrut = term scrut in
+       let* scrut = cterm scrut in
        let* motive = close1 motive in
-       let* case_zero = term case_zero in (* probably suboptimal *)
+       let* case_zero = cterm case_zero in (* probably suboptimal *)
        let* case_suc = close2 case_suc in
        return @@ nat_elim scrut motive case_zero case_suc
+
+    | C.Annot { tm; _ } ->
+       cterm tm
 
   and app v w =
     match v with
@@ -164,10 +173,10 @@ module Eval = struct
        Error.internal "ill-typed evaluation"
 
   and clo1 (C1 (env, Bound1 { body; user; })) v =
-    term body (extend_eval ?user v env)
+    cterm body (extend_eval ?user v env)
 
   and clo2 (C2 (env, Bound2 { body; user1; user2; })) v1 v2 =
-    term body (extend_eval ?user:user2 v2 (extend_eval ?user:user1 v1 env))
+    cterm body (extend_eval ?user:user2 v2 (extend_eval ?user:user1 v1 env))
 end
 
 module Quote = struct
@@ -225,12 +234,15 @@ module Quote = struct
          normal_clo2 ~ty:(Eval.clo1 motive (Suc x1)) case_succ x1 x2
        in
        let* motive = normal_clo1 ~ty:(Type L.inf) motive x1 in
-       return @@ C.Build.natelim ~scrut ~motive ~case_zero ~case_suc ()
+       return @@ C.Build.natelim
+                   ~scrut:(C.Build.infer scrut)
+                   ~motive ~case_zero ~case_suc ()
 
   and normal_eta ~ty ~tm =
     match ty, tm with
     | Reflect _, Reflect { tm; _ } ->
-       neutral tm
+       let* tm = neutral tm in
+       return @@ C.Build.infer tm
 
     | Type _, Type Inf ->
        Error.internal "limit universe quotation"
@@ -296,7 +308,8 @@ module Quote = struct
      we might be acting on an ill-typed value here. *)
   and value = function
     | Reflect { tm; _ } ->
-       neutral tm
+       let* tm = neutral tm in
+       return @@ C.Build.infer tm
 
     | Lam (C1 (env, body)) ->
        (* This could be written in direct style, but for the sake of consistency
@@ -485,7 +498,7 @@ module Conv = struct
 
   let normalize ~ty ~tm =
     let open Monad.Notation(Eval.M) in
-    let* tm = Eval.term tm in
+    let* tm = Eval.cterm tm in
     let* tm = Quote.(lift @@ normal @@ Reify { tm; ty; }) in
     return tm
 end
@@ -495,7 +508,7 @@ module PPrint = struct
     let tm =
       Quote.(run ~eta:false ~free:(DeBruijn.Env.width env) @@ value tm)
     in
-    Core.ToRaw.term tm (DeBruijn.Env.map (fun { user; _ } -> user) env)
+    Core.ToRaw.cterm tm (DeBruijn.Env.map (fun { user; _ } -> user) env)
     |> Raw.PPrint.term
 
   let entry { def; ty; user; } env doc =

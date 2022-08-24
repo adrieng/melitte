@@ -45,6 +45,8 @@ type term_desc =
   (** Dependent elimination form for natural numbers. *)
   | Type of int
   (** Universe hierarchy. *)
+  | Annot of { tm : term; ty : term; }
+  (** Type annotation. *)
 
 and term = term_desc Position.located
 
@@ -64,8 +66,8 @@ and bound2 =
 and ty = term
 
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty; def : term; }
-  | Eval of { def : term; ty : ty; }
+  | Val of { name : Name.t; ty : ty option; def : term; }
+  | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
 
@@ -110,14 +112,15 @@ module Build : sig
                 case_suc:bound2 ->
                 unit -> term
   val typ : ?loc:Position.t -> level:int -> unit -> term
+  val annot : ?loc:Position.t -> tm:term -> ty:ty -> unit -> term
   val bound1 : pattern -> term -> bound1
   val bound2 : pattern -> pattern -> term -> bound2
   val val_ : ?loc:Position.t ->
              name:Name.t ->
-             ty:term ->
+             ?ty:term ->
              def:term ->
              unit -> phrase
-  val eval : ?loc:Position.t -> ty:term -> def:term -> unit -> phrase
+  val eval : ?loc:Position.t -> def:term -> unit -> phrase
 end
 
 module PPrint : sig
