@@ -328,7 +328,8 @@ and check_def : 'a. name:Name.t -> ?ty:R.ty -> def:R.term ->
 let phrase : R.phrase -> C.t M.t -> C.t M.t =
   fun Position.{ value; position = loc; } file ->
   match value with
-  | Val { name; ty; def; } ->
+  | Val { name; ty; def; _ } ->
+     (* TODO *)
      check_def ~name ?ty ~def
        (fun ~ty ~def ->
          let* file = file in

@@ -18,6 +18,8 @@
 %right TIMES
 
 %start<Raw.t> file
+%type<Raw.hypothesis> hypothesis
+%type<Raw.telescope> telescope
 
 %%
 
@@ -89,10 +91,10 @@ term_:
 %inline ty: term { $1 }
 
 bind1(SEP):
-| p = pattern SEP t = term { Build.bound1 p t }
+| p = pattern SEP t = term { B.bound1 p t }
 
 bind2(SEP):
-| p1 = pattern COMMA p2 = pattern SEP t = term { Build.bound2 p1 p2 t }
+| p1 = pattern COMMA p2 = pattern SEP t = term { B.bound2 p1 p2 t }
 
 pattern_:
 | UNDERSCORE { B.pwildcard }
@@ -107,9 +109,19 @@ hyp:
 annot:
 | COLON ty = ty { ty }
 
+hypothesis_:
+| LPAREN pat = pattern COLON ty = ty RPAREN { B.hypothesis ~pat ~ty }
+
+(* Work around bug in Menhir or Dune. TODO investigate *)
+%inline hypothesis:
+| h = hypothesis_ { h ~loc:(Position.lex_join $startpos $endpos) () }
+
+telescope:
+| hypothesis* { $1 }
+
 phrase_desc:
-| VAL name = name ty = option(annot) EQ def = term
-  { B.val_ ~name ?ty ~def }
+| VAL name = name args = telescope ty = option(annot) EQ def = term
+  { B.val_ ~name ~args ?ty ~def }
 | EVAL def = term
   { B.eval ~def }
 

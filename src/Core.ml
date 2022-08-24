@@ -173,7 +173,7 @@ module ToRaw = struct
          let name = Name.of_option user in
          let* def = iterm def in
          let* env = M.get in
-         return (Raw.Val { name; ty = None; def; },
+         return (Raw.Val { name; args = []; ty = None; def; },
                  DeBruijn.Env.extend name env)
       | Eval { def; } ->
          let* def = iterm def in

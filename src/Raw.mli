@@ -65,8 +65,14 @@ and bound2 =
 
 and ty = term
 
+and telescope = hypothesis list
+
+and hypothesis_desc = Hyp of { pat : pattern; ty : ty; }
+
+and hypothesis = hypothesis_desc Position.located
+
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty option; def : term; }
+  | Val of { name : Name.t; args : telescope; ty : ty option; def : term; }
   | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
@@ -113,10 +119,12 @@ module Build : sig
                 unit -> term
   val typ : ?loc:Position.t -> level:int -> unit -> term
   val annot : ?loc:Position.t -> tm:term -> ty:ty -> unit -> term
+  val hypothesis : ?loc:Position.t -> pat:pattern -> ty:ty -> unit -> hypothesis
   val bound1 : pattern -> term -> bound1
   val bound2 : pattern -> pattern -> term -> bound2
   val val_ : ?loc:Position.t ->
              name:Name.t ->
+             args:telescope ->
              ?ty:term ->
              def:term ->
              unit -> phrase
@@ -131,6 +139,8 @@ module PPrint : sig
   val bound1 : bound1 -> PPrint.document
   val bound2 : bound2 -> PPrint.document
   val phrase : phrase -> PPrint.document
+  val hypothesis : hypothesis -> PPrint.document
+  val telescope : telescope -> PPrint.document
   val file : t -> PPrint.document
 end
 

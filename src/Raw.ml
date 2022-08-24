@@ -41,8 +41,14 @@ and bound2 =
 
 and ty = term
 
+and telescope = hypothesis list
+
+and hypothesis_desc = Hyp of { pat : pattern; ty : ty; }
+
+and hypothesis = hypothesis_desc Position.located
+
 type phrase_desc =
-  | Val of { name : Name.t; ty : ty option; def : term; }
+  | Val of { name : Name.t; args : telescope; ty : ty option; def : term; }
   | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
@@ -134,12 +140,15 @@ module Build = struct
   let annot ?(loc = Position.dummy) ~tm ~ty () =
     Position.with_pos loc @@ Annot { tm; ty; }
 
+  let hypothesis ?(loc = Position.dummy) ~pat ~ty () =
+    Position.with_pos loc @@ Hyp { pat; ty; }
+
   let typ ?(loc = Position.dummy) ~level () =
     if level < 0 then invalid_arg "typ";
     Position.with_pos loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ~name ?ty ~def () =
-    Position.with_pos loc @@ Val { name; ty; def; }
+  let val_ ?(loc = Position.dummy) ~name ~args ?ty ~def () =
+    Position.with_pos loc @@ Val { name; args; ty; def; }
 
   let eval ?(loc = Position.dummy) ~def () =
     Position.with_pos loc @@ Eval { def; }
@@ -326,8 +335,17 @@ module PPrint = struct
     | None -> pattern p
     | Some ty -> group @@ pattern p ^^ space ^^ colon ^/^ typ ty
 
+  and hypothesis_desc (Hyp { pat; ty }) =
+    group @@ pattern pat ^^ space ^^ colon ^/^ typ ty
+
+  and hypothesis h = Position.located hypothesis_desc h
+
+  and telescope tele =
+    group @@ separate_map (break 1) hypothesis tele
+
   and phrase_desc = function
-    | Val { name; ty; def; } ->
+    | Val { name; ty; def; _ } ->
+       (* TODO *)
        bindN (!^ "val") equals [hyp ?ty (Build.pvar ~name ())] (term def)
     | Eval { def; } ->
        prefix 2 1 (!^ "eval") (term def)
