@@ -11,8 +11,6 @@ type cterm_desc =
   | Sigma of cterm * bound1
   | Pair of cterm * cterm
   | Nat
-  | Zero
-  | Suc of cterm
   | Type of int
 
 and cterm =
@@ -28,6 +26,8 @@ and iterm_desc =
   | App of iterm * cterm
   | Fst of iterm
   | Snd of iterm
+  | Zero
+  | Suc of cterm
   | Natelim of { scrut : cterm;
                  motive : bound1;
                  case_zero : cterm;
@@ -90,14 +90,14 @@ module Build : sig
   val sigma : ?loc:Position.t -> cterm -> bound1 -> cterm
   val pair : ?loc:Position.t -> cterm -> cterm -> cterm
   val nat : ?loc:Position.t -> unit -> cterm
-  val zero : ?loc:Position.t -> unit -> cterm
-  val suc : ?loc:Position.t -> cterm -> cterm
   val var : ?loc:Position.t -> DeBruijn.Ix.t -> iterm
   val typ : ?loc:Position.t -> level:int -> unit -> cterm
 
   val app : ?loc:Position.t -> iterm -> cterm -> iterm
   val fst : ?loc:Position.t -> iterm -> iterm
   val snd : ?loc:Position.t -> iterm -> iterm
+  val zero : ?loc:Position.t -> unit -> iterm
+  val suc : ?loc:Position.t -> cterm -> iterm
   val natelim : ?loc:Position.t ->
                 scrut:cterm ->
                 motive:bound1 ->

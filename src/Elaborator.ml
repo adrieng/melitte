@@ -200,26 +200,7 @@ let rec check : expected:S.ty -> R.term -> C.cterm M.t =
 
      end
 
-  | Zero ->
-     begin match expected with
-     | Nat ->
-        return @@ C.Build.zero ~loc ()
-
-     | actual ->
-        unexpected_head_constr ~expected:`Nat ~actual loc
-     end
-
-  | Suc m ->
-     begin match expected with
-     | Nat ->
-        let* m = check ~expected m in
-        return @@ C.Build.suc ~loc m
-
-     | actual ->
-        unexpected_head_constr ~expected:`Nat ~actual loc
-     end
-
-  | Var _ | App _ | Natelim _ | Fst _ | Snd _ | Annot _ ->
+  | Var _ | App _ | Zero | Suc _ | Natelim _ | Fst _ | Snd _ | Annot _ ->
      let* tm, actual = infer tm in
      let* () = check_conv ~expected ~actual loc in
      return @@ C.Build.infer ~loc tm
@@ -269,6 +250,13 @@ and infer : R.term -> (C.iterm * S.ty) M.t =
           unexpected_head_constr ~expected:`Sigma ~actual m.C.i_loc
        end
 
+    | Zero ->
+        return @@ (C.Build.zero ~loc (), S.Nat)
+
+    | Suc m ->
+       let* m = check ~expected:S.Nat m in
+       return @@ (C.Build.suc ~loc m, S.Nat)
+
     | Natelim { scrut; motive; case_zero; case_suc; } ->
        let* scrut = check ~expected:Nat scrut in
        let* motive =
@@ -295,7 +283,7 @@ and infer : R.term -> (C.iterm * S.ty) M.t =
        let* tm = check ~expected tm in
        return @@ (C.Build.annot ~loc ~ty ~tm (), expected)
 
-    | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat | Type _ | Zero | Suc _ ->
+    | Let _ | Pi _ | Sigma _ | Lam _ | Pair _ | Nat | Type _ ->
        Error.could_not_synthesize loc
   in
   let* () = on_infer_post ~actual:ty tm in

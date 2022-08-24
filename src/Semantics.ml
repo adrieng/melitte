@@ -94,13 +94,6 @@ module Eval = struct
     | C.Nat ->
        return Nat
 
-    | C.Zero ->
-       return Zero
-
-    | C.Suc t ->
-       let* t = cterm t in
-       return @@ Suc t
-
   and iterm : C.iterm -> value M.t =
     fun tm ->
     match tm.i_desc with
@@ -124,6 +117,13 @@ module Eval = struct
     | C.Snd t ->
        let* t = iterm t in
        return @@ snd t
+
+    | C.Zero ->
+       return Zero
+
+    | C.Suc t ->
+       let* t = cterm t in
+       return @@ Suc t
 
     | C.Natelim { scrut; motive; case_zero; case_suc; } ->
        let* scrut = cterm scrut in
@@ -277,11 +277,11 @@ module Quote = struct
        return @@ C.Build.pair left right
 
     | Nat, Zero ->
-       return @@ C.Build.zero ()
+       return @@ C.Build.(infer @@ zero ())
 
     | Nat, Suc tm ->
        let* tm = normal_ ~ty ~tm in
-       return @@ C.Build.suc tm
+       return @@ C.Build.(infer @@ suc tm)
 
     | _ ->
        Error.internal "ill-typed normal quotation"
@@ -360,11 +360,11 @@ module Quote = struct
        return @@ C.Build.nat ()
 
     | Zero ->
-       return @@ C.Build.zero ()
+       return @@ C.Build.(infer @@ zero ())
 
     | Suc tm ->
        let* tm = value tm in
-       return @@ C.Build.suc tm
+       return @@ C.Build.(infer @@ suc tm)
 end
 
 module Conv = struct
