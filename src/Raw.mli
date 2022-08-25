@@ -72,7 +72,7 @@ and hypothesis_desc = Hyp of { pat : pattern; ty : ty; }
 and hypothesis = hypothesis_desc Position.located
 
 type phrase_desc =
-  | Val of { name : Name.t; args : telescope; ty : ty option; def : term; }
+  | Val of { name : Name.t; args : telescope; ty : ty; def : term; }
   | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
@@ -90,7 +90,7 @@ module Build : sig
   val var : ?loc:Position.t -> name:Name.t -> unit -> term
   val let_ : ?loc:Position.t -> def:term -> ty:ty -> body:bound1 -> unit -> term
   val pi : ?loc:Position.t -> dom:ty -> cod:bound1 -> unit -> ty
-  val pi_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+  val pi_n : ?loc:Position.t -> params:telescope -> body:ty ->
                  unit -> ty
   val arrow : ?loc:Position.t -> dom:ty -> cod:ty -> unit -> ty
   val lam : ?loc:Position.t -> param:pattern -> body:term -> unit -> term
@@ -101,7 +101,7 @@ module Build : sig
   val app : ?loc:Position.t -> func:term -> arg:term -> unit -> term
   val app_n : ?loc:Position.t -> func:term -> args:term list -> unit -> term
   val sigma : ?loc:Position.t -> base:ty -> total:bound1 -> unit -> ty
-  val sigma_n : ?loc:Position.t -> params:(pattern * ty) list -> body:ty ->
+  val sigma_n : ?loc:Position.t -> params:telescope -> body:ty ->
                  unit -> ty
   val product : ?loc:Position.t -> left:ty -> right:ty -> unit -> ty
   val pair : ?loc:Position.t -> left:term -> right:term -> unit -> term
@@ -125,7 +125,7 @@ module Build : sig
   val val_ : ?loc:Position.t ->
              name:Name.t ->
              args:telescope ->
-             ?ty:term ->
+             ty:term ->
              def:term ->
              unit -> phrase
   val eval : ?loc:Position.t -> def:term -> unit -> phrase
@@ -149,3 +149,5 @@ val name_option_of_pattern : pattern -> Name.t option
 (** [name_of_pattern p] sends [PWildcard] to [Name.dummy] and [PVar x] to
     [x]. *)
 val name_of_pattern : pattern -> Name.t
+
+val patterns_of_telescope : telescope -> pattern list

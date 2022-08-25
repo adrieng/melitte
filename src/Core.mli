@@ -54,7 +54,7 @@ and bound2 =
     }
 
 and phrase_desc =
-  | Val of { user : Name.t option; def : iterm; }
+  | Val of { user : Name.t option; ty : cterm; def : cterm; }
   | Eval of { def : iterm; }
 
 and phrase =
@@ -66,6 +66,8 @@ and phrase =
 and t = phrase list
 
 type ty = cterm
+
+and telescope = (Name.t option * ty) list
 
 val sexp_of_cterm : cterm -> Sexplib.Sexp.t
 val sexp_of_iterm : iterm -> Sexplib.Sexp.t
@@ -86,8 +88,10 @@ module Build : sig
              unit ->
              cterm
   val pi : ?loc:Position.t -> cterm -> bound1 -> cterm
+  val pi_n : ?loc:Position.t -> telescope -> cterm -> cterm
   val lam : ?loc:Position.t -> bound1 -> cterm
   val sigma : ?loc:Position.t -> cterm -> bound1 -> cterm
+  val sigma_n : ?loc:Position.t -> telescope -> cterm -> cterm
   val pair : ?loc:Position.t -> cterm -> cterm -> cterm
   val nat : ?loc:Position.t -> unit -> cterm
   val var : ?loc:Position.t -> DeBruijn.Ix.t -> iterm
@@ -108,7 +112,8 @@ module Build : sig
 
   val val_ : ?loc:Position.t ->
              ?user:Name.t ->
-             def:iterm ->
+             ty:cterm ->
+             def:cterm ->
              unit ->
              phrase
   val eval : ?loc:Position.t ->

@@ -69,9 +69,9 @@ term_:
   { B.lam_n ~params ~body }
 | LET p = pattern COLON ty = ty EQ def = term IN body = term
   { B.let_ ~def ~ty ~body:(B.bound1 p body) }
-| FORALL params = parens(hyp)+ ARR body = ty
+| FORALL params = telescope ARR body = ty
   { B.pi_n ~params ~body }
-| SIGMA params = parens(hyp)+ TIMES body = ty
+| SIGMA params = telescope TIMES body = ty
   { B.sigma_n ~params ~body }
 | dom = term ARR cod = term
   { B.arrow ~dom ~cod }
@@ -109,9 +109,6 @@ pattern_:
 hyp:
 | p = pattern COLON ty = ty { (p, ty) }
 
-annot:
-| COLON ty = ty { ty }
-
 hypothesis_:
 | LPAREN pat = pattern COLON ty = ty RPAREN { B.hypothesis ~pat ~ty }
 
@@ -123,8 +120,8 @@ telescope:
 | hypothesis* { $1 }
 
 phrase_desc:
-| VAL name = name args = telescope ty = option(annot) EQ def = term
-  { B.val_ ~name ~args ?ty ~def }
+| VAL name = name args = telescope COLON ty = ty EQ def = term
+  { B.val_ ~name ~args ~ty ~def }
 | EVAL def = term
   { B.eval ~def }
 

@@ -56,7 +56,7 @@ and bound2 =
     }
 
 and phrase_desc =
-  | Val of { user : Name.t option; def : iterm; }
+  | Val of { user : Name.t option; ty : cterm; def : cterm; }
   | Eval of { def : iterm; }
 
 and phrase =
@@ -70,6 +70,8 @@ and phrase =
 and t = phrase list [@@deriving sexp_of, eq]
 
 type ty = cterm
+
+type telescope = (Name.t option * ty) list
 
 module ToRaw = struct
   type env = Name.t DeBruijn.Env.t
@@ -169,11 +171,12 @@ module ToRaw = struct
   let phrase { ph_desc; ph_loc; } =
     let* desc, env =
       match ph_desc with
-      | Val { user; def; } ->
+      | Val { user; ty; def; } ->
          let name = Name.of_option user in
-         let* def = iterm def in
+         let* ty = cterm ty in
+         let* def = cterm def in
          let* env = M.get in
-         return (Raw.Val { name; args = []; ty = None; def; },
+         return (Raw.Val { name; args = []; ty; def; },
                  DeBruijn.Env.extend name env)
       | Eval { def; } ->
          let* def = iterm def in
@@ -203,11 +206,21 @@ module Build = struct
 
   let let_ ?loc ~def ~ty ~body () = cdesc ?loc @@ Let { def; ty; body; }
 
+  let bind_n mk ?loc tele body =
+    List.fold_right
+      (fun (user, a) body -> mk ?loc a (Bound1 { body; user; }))
+      tele
+      body
+
   let pi ?loc a f = cdesc ?loc @@ Pi (a, f)
+
+  let pi_n ?loc tele body = bind_n pi ?loc tele body
 
   let lam ?loc bound = cdesc ?loc @@ Lam bound
 
   let sigma ?loc a f = cdesc ?loc @@ Sigma (a, f)
+
+  let sigma_n ?loc tele body = bind_n sigma ?loc tele body
 
   let pair ?loc left right = cdesc ?loc @@ Pair (left, right)
 
@@ -233,8 +246,8 @@ module Build = struct
   let annot ?loc ~tm ~ty () =
     idesc ?loc @@ Annot { tm; ty; }
 
-  let val_ ?(loc = Position.dummy) ?user ~def () =
-    { ph_loc = loc; ph_desc = Val { user; def; } }
+  let val_ ?(loc = Position.dummy) ?user ~ty ~def () =
+    { ph_loc = loc; ph_desc = Val { user; ty; def; } }
 
   let eval ?(loc = Position.dummy) ~def () =
     { ph_loc = loc; ph_desc = Eval { def; } }

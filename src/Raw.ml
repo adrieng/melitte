@@ -48,7 +48,7 @@ and hypothesis_desc = Hyp of { pat : pattern; ty : ty; }
 and hypothesis = hypothesis_desc Position.located
 
 type phrase_desc =
-  | Val of { name : Name.t; args : telescope; ty : ty option; def : term; }
+  | Val of { name : Name.t; args : telescope; ty : ty; def : term; }
   | Eval of { def : term; }
 
 and phrase = phrase_desc Position.located
@@ -77,9 +77,9 @@ module Build = struct
   let binder_n ?(loc = Position.dummy) ~binder ~params ~body () =
     Position.{
         (List.fold_right
-           (fun (p, a) b ->
-             with_pos (join (join p.position a.position) b.position)
-               (binder a (bound1 p b))) params body)
+           (fun { Position.value = Hyp { pat; ty = a; }; _ } b ->
+             with_pos (join (join pat.position a.position) b.position)
+               (binder a (bound1 pat b))) params body)
       with position = loc;
     }
 
@@ -147,7 +147,7 @@ module Build = struct
     if level < 0 then invalid_arg "typ";
     Position.with_pos loc @@ Type level
 
-  let val_ ?(loc = Position.dummy) ~name ~args ?ty ~def () =
+  let val_ ?(loc = Position.dummy) ~name ~args ~ty ~def () =
     Position.with_pos loc @@ Val { name; args; ty; def; }
 
   let eval ?(loc = Position.dummy) ~def () =
@@ -341,12 +341,15 @@ module PPrint = struct
   and hypothesis h = Position.located hypothesis_desc h
 
   and telescope tele =
-    group @@ separate_map (break 1) hypothesis tele
+    group @@ concat @@ List.map (fun h -> break 1 ^^ hypothesis h) tele
 
   and phrase_desc = function
-    | Val { name; ty; def; _ } ->
-       (* TODO *)
-       bindN (!^ "val") equals [hyp ?ty (Build.pvar ~name ())] (term def)
+    | Val { name = n; args; ty; def; } ->
+       (* TODO rationalize *)
+       prefix 2 1
+         (group @@ !^ "val" ^^ space ^^ name n ^^ telescope args
+                   ^/^ colon ^^ space ^^ typ ty ^/^ !^ "=")
+         (group @@ term def)
     | Eval { def; } ->
        prefix 2 1 (!^ "eval") (term def)
 
@@ -363,3 +366,5 @@ let name_option_of_pattern Position.{ value; _ } =
 let name_of_pattern p =
   Name.of_option @@ name_option_of_pattern p
 
+let patterns_of_telescope tele =
+  List.map (fun { Position.value = Hyp { pat; _ }; _ } -> pat) tele

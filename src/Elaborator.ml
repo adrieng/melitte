@@ -328,13 +328,15 @@ and check_def : 'a. name:Name.t -> ?ty:R.ty -> def:R.term ->
 let phrase : R.phrase -> C.t M.t -> C.t M.t =
   fun Position.{ value; position = loc; } file ->
   match value with
-  | Val { name; ty; def; _ } ->
-     (* TODO *)
-     check_def ~name ?ty ~def
+  | Val { name; args; ty; def; } ->
+     let ty = R.Build.pi_n ~loc ~params:args ~body:ty () in
+     let def =
+       R.Build.lam_n ~loc ~params:(R.patterns_of_telescope args) ~body:def ()
+     in
+     check_def ~name ~ty ~def
        (fun ~ty ~def ->
          let* file = file in
-         let def = C.Build.annot ~tm:def ~ty () in
-         return @@ C.Build.val_ ~loc ~user:name ~def () :: file)
+         return @@ C.Build.val_ ~loc ~user:name ~def ~ty () :: file)
   | Eval { def; } ->
      let* def, tysem = infer def in
      let* def = liftE @@ S.Conv.normalize ~ty:tysem ~tm:(C.Build.infer def) in

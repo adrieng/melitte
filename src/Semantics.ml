@@ -353,8 +353,10 @@ module Quote = struct
        return @@ C.Build.typ ~level ()
 
     | Type Inf ->
+       (* /!\ This function should only ever be used for printing, in which case
+          this clause is not problematic even if the returned quotation is
+          nonsensical. /!\ *)
        return @@ C.Build.typ ~level:max_int ()
-       (* Error.internal "limit universe quotation" *)
 
     | Nat ->
        return @@ C.Build.nat ()
