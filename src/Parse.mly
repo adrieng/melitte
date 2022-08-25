@@ -17,7 +17,10 @@
 %right ARR
 %right TIMES
 
-%start<Raw.t> file
+%start<Raw.t> whole_file
+%start<Raw.phrase> whole_phrase
+%start<Raw.term> whole_term
+
 %type<Raw.hypothesis> hypothesis
 %type<Raw.telescope> telescope
 
@@ -112,7 +115,7 @@ annot:
 hypothesis_:
 | LPAREN pat = pattern COLON ty = ty RPAREN { B.hypothesis ~pat ~ty }
 
-(* Work around bug in Menhir or Dune. TODO investigate *)
+(* Workaround for a bug in Menhir and/or Dune. TODO investigate *)
 %inline hypothesis:
 | h = hypothesis_ { h ~loc:(Position.lex_join $startpos $endpos) () }
 
@@ -129,7 +132,19 @@ phrase_desc:
 | p = located(phrase_desc) { p }
 
 file:
-| xs = phrase* EOF { xs }
+| phrase* { $1 }
+
+whole(X):
+| x = X EOF { x }
 | error { Error.syntax "syntax error" $startpos $endpos }
+
+whole_file:
+| whole(file) { $1 }
+
+whole_phrase:
+| whole(phrase) { $1 }
+
+whole_term:
+| whole(term) { $1 }
 
 %%

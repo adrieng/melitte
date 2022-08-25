@@ -7,7 +7,10 @@ let parse inp =
   let lexbuf = Sedlexing.Utf8.from_channel ic in
   Sedlexing.set_filename lexbuf fname;
   let token = Sedlexing.with_tokenizer Lex.token lexbuf in
-  let file = MenhirLib.Convert.Simplified.traditional2revised Parse.file in
+  let file =
+    MenhirLib.Convert.Simplified.traditional2revised
+      Parse.whole_file
+  in
   let raw = file token in
   close_in ic;
   raw
