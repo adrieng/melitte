@@ -39,9 +39,9 @@ and neutral
 (** A normal form is a value "reified" at some type. *)
 and normal = Reify of { ty : value; tm : value; }
 
-and clo1 = C1 of env * Core.bound1
+and clo1
 
-and clo2 = C2 of env * Core.bound2
+and clo2
 
 and entry =
   {

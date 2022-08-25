@@ -30,8 +30,9 @@ and normal =
   | Reify of { ty : value; tm : value; }
 
 and clo1 = C1 of env * C.bound1
+         | C1suc of clo1
 
-and clo2 = C2 of env * C.bound2
+and clo2 = C2 of env * C.bound2 (* (λx.λy.M){σ} *)
 
 and entry =
   {
@@ -46,8 +47,9 @@ type ty = value
 
 (* Utility functions *)
 
-let clo1_name (C1 (_, C.Bound1 { user; _ })) =
-  Option.value ~default:Name.dummy user
+let rec clo1_name = function
+  | C1 (_, C.Bound1 { user; _ }) -> Name.of_option user
+  | C1suc clo -> clo1_name clo
 
 let close1 b1 env = C1 (env, b1)
 
@@ -201,25 +203,20 @@ module Eval = struct
        (* Struct( Zero , (x.P){σ}) = P{σ,x↦Zero}
           Struct(Suc(m), (x.P){σ}) =
           Σ (P{σ,x↦Zero}, (_.Struct(m, λy.let x = suc y in P)){σ}) *)
-       let x =
-         Lam (..., App (Lam clo) (Suc v))
-
-
-
-       let C1 (env, b1) = body in
-       let env =
-         let x = Var (DeBruijn.Lv.fresh ~free:(DeBruijn.Env.width env)) in
-         extend_eval (Suc (Reflect { ty = Nat; tm = x; })) env
-       in
-       let f = struct_ lv d (C1 (env, b1)) in
-       Sigma (a, C1 (DeBruijn.Env.empty, C.Bound1 { user = None; body = f; }))
+       let a = clo1 clo Zero in
+       let f = struct_ lv d (C1suc clo) in
+       Sigma (a, assert false)
     | Reflect { ty = Nat; tm; } ->
-       Reflect { ty = Type (L.fin lv); tm = Struct (lv, tm, body); }
+       Reflect { ty = Type (L.fin lv); tm = Struct (lv, tm, clo); }
     | _ ->
        Error.internal "ill-typed evaluation"
 
-  and clo1 (C1 (env, Bound1 { body; user; })) v =
-    cterm body (extend_eval ?user v env)
+  and clo1 c1 v =
+    match c1 with
+    | C1 (env, Bound1 { body; user; }) ->
+       cterm body (extend_eval ?user v env)
+    | C1suc c1 ->
+       clo1 c1 (Suc v)
 
   and clo2 (C2 (env, Bound2 { body; user1; user2; })) v1 v2 =
     cterm body (extend_eval ?user:user2 v2 (extend_eval ?user:user1 v1 env))
