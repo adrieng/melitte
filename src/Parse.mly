@@ -81,7 +81,7 @@ term_:
   { B.arrow ~dom ~cod }
 | left = term TIMES right = term
   { B.product ~left ~right }
-| ELIM scrut = term motive = motive
+| ELIM NAT scrut = term motive = motive
   LBRACE
   BAR? ZERO DARR case_zero = term
   BAR SUC case_suc = bind2(DARR)

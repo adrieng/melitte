@@ -180,6 +180,9 @@ module PPrint = struct
 
   let pattern = Position.located pattern_desc
 
+  let elim = function
+    | `Nat -> !^ "elim " ^^ U.(doc nat)
+
   let rec term_desc = function
     | (Var _ | Type _ | Nat | Zero | Suc _ | App _ | Fst _ | Snd _
        | UnitTy | Unit | Fin _) as t ->
@@ -251,7 +254,7 @@ module PPrint = struct
     | Natelim { scrut; motive; case_zero; case_suc; } ->
        let m = bind1 (!^ " with") U.(doc drarrow) motive in
        prefix 2 1
-         (group (!^ "elim" ^/^ term scrut ^^ m))
+         (group (elim `Nat ^/^ term scrut ^^ m))
          (braces @@ separate (break 1 ^^ bar)
                       [
                         bind0 (!^ " zero") U.(doc drarrow) case_zero;

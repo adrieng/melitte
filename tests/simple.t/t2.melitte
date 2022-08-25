@@ -3,11 +3,11 @@ val c : ℕ → ℕ = λ n ⇒ n
 eval (suc (c 0) : ℕ)
 
 val add : ℕ → ℕ → ℕ =
-  λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ m | suc _, r ⇒ suc r }
+  λ n m ⇒ elim ℕ n with _ ⇒ ℕ { zero ⇒ m | suc _, r ⇒ suc r }
 
 eval add 2 5
 
 val mul : ℕ → ℕ → ℕ =
-  λ n m ⇒ elim n with _ ⇒ ℕ { zero ⇒ 0 | suc _, r ⇒ add m r }
+  λ n m ⇒ elim ℕ n with _ ⇒ ℕ { zero ⇒ 0 | suc _, r ⇒ add m r }
 
 eval mul 3 10
