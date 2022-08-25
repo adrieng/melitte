@@ -36,7 +36,7 @@ let make codepoints ascii_fallback =
 
 let lambda = make [| 955 |] "\\"
 
-let forall = make [| 8704 |] "forall"
+let forall = make [| 8704 |] "Forall"
 
 let srarrow = make [| 8594 |] "->"
 
@@ -62,6 +62,8 @@ let omega = make [| 0x03C9 |] "omega"
 
 let times = make [| 0x00D7 |] "*"
 
-let sigma = make [| 0x03A3 |] "sigma"
+let sigma = make [| 0x03A3 |] "Sig"
 
-let unit = make [| 0x1D7D9 |] "unit"
+let unit = make [| 0x1D7D9 |] "Unit"
+
+let struct_ = make [| 0x1D54A |] "Struct"

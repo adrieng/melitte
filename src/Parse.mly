@@ -8,9 +8,9 @@
 %token<int> INT
 
 %token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL FST SND
-%token UNITTY FIN
+%token UNITTY FIN STRUCT
 %token LPAREN RPAREN LBRACE RBRACE
-%token EQ ARR DARR TIMES
+%token EQ ARR DARR TIMES LT AT
 %token UNDERSCORE COLON BAR COMMA
 %token EOF
 
@@ -36,9 +36,12 @@
 %inline name:
 | id = ID { Name.of_string id }
 
+level:
+| lv = INT { lv }
+
 very_simple_term_:
 | name = name { B.var ~name }
-| TYPE level = INT { B.typ ~level }
+| TYPE lv = level { B.typ ~lv }
 | NAT { B.nat }
 | k = INT { B.lit ~k }
 | ZERO { B.zero }
@@ -79,6 +82,8 @@ term_:
   { B.sigma_n ~params ~body }
 | dom = term ARR cod = term
   { B.arrow ~dom ~cod }
+| LPAREN left = term COMMA right = term RPAREN
+  { B.pair ~left ~right }
 | left = term TIMES right = term
   { B.product ~left ~right }
 | ELIM NAT scrut = term motive = motive
@@ -87,8 +92,8 @@ term_:
   BAR SUC case_suc = bind2(DARR)
   RBRACE
   { B.natelim ~scrut ~motive ~case_zero ~case_suc }
-| LPAREN left = term COMMA right = term RPAREN
-  { B.pair ~left ~right }
+| STRUCT LPAREN p = pattern LT scrut = term AT lv = level RPAREN ARR body = term
+  { B.struct_ ~lv ~scrut ~body:(B.bound1 p body) }
 | LPAREN tm = term COLON ty = ty RPAREN
   { B.annot ~tm ~ty }
 

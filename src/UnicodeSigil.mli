@@ -45,3 +45,5 @@ val times : t
 val sigma : t
 
 val unit : t
+
+val struct_ : t

@@ -49,6 +49,8 @@ type term_desc =
   (** Unit constructor. *)
   | Fin of term
   (** Type of finite sets, indexed by its size (of type Nat). *)
+  | Struct of { lv : int; scrut : term; body : bound1; }
+  (** Finite family of [scrut] size. *)
   | Type of int
   (** Universe hierarchy. *)
   | Annot of { tm : term; ty : term; }
@@ -126,7 +128,9 @@ module Build : sig
   val unit_ty : ?loc:Position.t -> unit -> term
   val unit : ?loc:Position.t -> unit -> term
   val fin : ?loc:Position.t -> sz:term -> unit -> term
-  val typ : ?loc:Position.t -> level:int -> unit -> term
+  val struct_ : ?loc:Position.t -> lv:int -> scrut:term ->
+                body:bound1 -> unit -> term
+  val typ : ?loc:Position.t -> lv:int -> unit -> term
   val annot : ?loc:Position.t -> tm:term -> ty:ty -> unit -> term
   val hypothesis : ?loc:Position.t -> pat:pattern -> ty:ty -> unit -> hypothesis
   val bound1 : pattern -> term -> bound1

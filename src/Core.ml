@@ -32,6 +32,9 @@ and iterm_desc =
                  motive : bound1;
                  case_zero : cterm;
                  case_suc : bound2; }
+  | Struct of { lv : int;
+                scrut : cterm;
+                body : bound1; }
   | Annot of { tm : cterm; ty : cterm; }
 
 and iterm =
@@ -159,6 +162,10 @@ module ToRaw = struct
          let* case_zero = cterm case_zero in
          let* case_suc = bound2 case_suc in
          return @@ Raw.Natelim { scrut; motive; case_zero; case_suc; }
+      | Struct { lv; scrut; body; } ->
+         let* scrut = cterm scrut in
+         let* body = bound1 body in
+         return @@ Raw.Struct { lv; scrut; body; }
       | Annot { tm; ty; } ->
          let* tm = cterm tm in
          let* ty = cterm ty in
@@ -261,6 +268,9 @@ module Build = struct
 
   let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
     idesc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }
+
+  let struct_ ?loc ~lv ~scrut ~body () =
+    idesc ?loc @@ Struct { lv; scrut; body; }
 
   let annot ?loc ~tm ~ty () =
     idesc ?loc @@ Annot { tm; ty; }

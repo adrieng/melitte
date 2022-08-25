@@ -36,6 +36,9 @@ and iterm_desc =
                  motive : bound1;
                  case_zero : cterm;
                  case_suc : bound2; }
+  | Struct of { lv : int;
+                scrut : cterm;
+                body : bound1; }
   | Annot of { tm : cterm; ty : cterm; }
 
 and iterm =
@@ -114,6 +117,11 @@ module Build : sig
                 motive:bound1 ->
                 case_zero:cterm ->
                 case_suc:bound2 ->
+                unit -> iterm
+  val struct_ : ?loc:Position.t ->
+                lv:int ->
+                scrut:cterm ->
+                body:bound1 ->
                 unit -> iterm
   val annot : ?loc:Position.t -> tm:cterm -> ty:cterm -> unit -> iterm
 

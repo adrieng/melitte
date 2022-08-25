@@ -251,7 +251,7 @@ let rec check : expected:S.ty -> R.term -> C.cterm M.t =
 
      end
 
-  | Var _ | App _ | Natelim _ | Fst _ | Snd _ | Annot _ ->
+  | Var _ | App _ | Natelim _ | Struct _ | Fst _ | Snd _ | Annot _ ->
      let* tm, actual = infer tm in
      let* () = check_conv ~expected ~actual loc in
      return @@ C.Build.infer ~loc tm
@@ -320,6 +320,16 @@ and infer : R.term -> (C.iterm * S.ty) M.t =
        in
        return @@ (C.Build.natelim ~loc ~scrut ~motive ~case_zero ~case_suc (),
                   resty)
+
+    | Struct { lv; scrut; body; } ->
+       let lvi = L.fin lv in
+       let* scrut = check ~expected:Nat scrut in
+       let* scrutsem = ceval scrut in
+       let* body =
+         let$ _ = fresh ~ty:(Fin scrutsem) @@ bound1_name body in
+         check_bound1 ~expected:(Type lvi) body
+       in
+       return @@ (C.Build.struct_ ~lv ~scrut ~body (), S.Type lvi)
 
     | Annot { tm; ty; } ->
        let* ty = check_is_ty ty in

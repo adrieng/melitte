@@ -24,6 +24,7 @@ type term_desc =
   | UnitTy
   | Unit
   | Fin of term
+  | Struct of { lv : int; scrut : term; body : bound1; }
   | Type of int
   | Annot of { tm : term; ty : term; }
 
@@ -151,9 +152,13 @@ module Build = struct
   let fin ?(loc = Position.dummy) ~sz () =
     Position.with_pos loc @@ Fin sz
 
-  let typ ?(loc = Position.dummy) ~level () =
-    if level < 0 then invalid_arg "typ";
-    Position.with_pos loc @@ Type level
+  let struct_ ?(loc = Position.dummy) ~lv ~scrut ~body () =
+    if lv < 0 then invalid_arg "struct_";
+    Position.with_pos loc @@ Struct { lv; scrut; body; }
+
+  let typ ?(loc = Position.dummy) ~lv () =
+    if lv < 0 then invalid_arg "typ";
+    Position.with_pos loc @@ Type lv
 
   let annot ?(loc = Position.dummy) ~tm ~ty () =
     Position.with_pos loc @@ Annot { tm; ty; }
@@ -173,6 +178,9 @@ module PPrint = struct
   module U = UnicodeSigil
 
   let name = Name.pp
+
+  let level lv =
+    if lv = max_int then !^ "top" else ExtPrint.int lv
 
   let pattern_desc = function
     | PWildcard -> !^ "_"
@@ -264,6 +272,14 @@ module PPrint = struct
     | Pair (left, right) ->
        parens @@ group @@ term left ^^ comma ^/^ term right
 
+    | Struct { lv; scrut; body = Bound1 { pat; body; }; } ->
+    (* TODO rationalize *)
+       group @@
+         U.(doc struct_)
+         ^/^ parens (group @@ pattern pat ^/^ !^ "< " ^^ term scrut ^/^
+                                !^ "@ " ^^ level lv)
+         ^^ U.(doc srarrow) ^/^ term body
+
     | Annot { tm; ty; } ->
        (* TODO factor into some `hypothesis` function. *)
        parens @@ group @@ term tm ^^ space ^^ colon ^/^ term ty
@@ -283,8 +299,8 @@ module PPrint = struct
     | Var x ->
        name x
 
-    | Type l ->
-       U.(doc typ ^^ space ^^ if l = max_int then !^ "top" else ExtPrint.int l)
+    | Type lv ->
+       U.(doc typ ^^ space ^^ level lv)
 
     | Nat ->
        U.(doc nat)

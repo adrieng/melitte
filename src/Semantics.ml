@@ -22,6 +22,7 @@ and neutral =
   | Var of DeBruijn.Lv.t
   | App of neutral * normal
   | Natelim of neutral * clo1 * value * clo2
+  | Struct of int * neutral * clo1
   | Fst of neutral
   | Snd of neutral
 
@@ -145,6 +146,11 @@ module Eval = struct
        let* case_suc = close2 case_suc in
        return @@ nat_elim scrut motive case_zero case_suc
 
+    | C.Struct { lv; scrut; body; } ->
+       let* scrut = cterm scrut in
+       let* body = close1 body in
+       return @@ struct_ lv scrut body
+
     | C.Annot { tm; _ } ->
        cterm tm
 
@@ -181,7 +187,34 @@ module Eval = struct
        let vp = nat_elim n m u0 uN in
        clo2 uN n vp
     | Reflect { ty = Nat; tm; } ->
-       Reflect { ty = Nat; tm = Natelim (tm, m, u0, uN); }
+       Reflect { ty = clo1 m d; tm = Natelim (tm, m, u0, uN); }
+    | _ ->
+       Error.internal "ill-typed evaluation"
+
+  and struct_ lv d clo =
+    match d with
+    | Zero ->
+       UnitTy
+    | Suc d ->
+       (* Struct (Suc m) (x.P) = P[x\Zero] * Struct m (x.P[x\Suc x]) *)
+
+       (* Struct( Zero , (x.P){σ}) = P{σ,x↦Zero}
+          Struct(Suc(m), (x.P){σ}) =
+          Σ (P{σ,x↦Zero}, (_.Struct(m, λy.let x = suc y in P)){σ}) *)
+       let x =
+         Lam (..., App (Lam clo) (Suc v))
+
+
+
+       let C1 (env, b1) = body in
+       let env =
+         let x = Var (DeBruijn.Lv.fresh ~free:(DeBruijn.Env.width env)) in
+         extend_eval (Suc (Reflect { ty = Nat; tm = x; })) env
+       in
+       let f = struct_ lv d (C1 (env, b1)) in
+       Sigma (a, C1 (DeBruijn.Env.empty, C.Bound1 { user = None; body = f; }))
+    | Reflect { ty = Nat; tm; } ->
+       Reflect { ty = Type (L.fin lv); tm = Struct (lv, tm, body); }
     | _ ->
        Error.internal "ill-typed evaluation"
 
@@ -250,6 +283,16 @@ module Quote = struct
        return @@ C.Build.natelim
                    ~scrut:(C.Build.infer scrut)
                    ~motive ~case_zero ~case_suc ()
+
+    | Struct (lv, scrut, body) ->
+       let user = clo1_name body in
+       let scrutsem = Reflect { ty = Nat; tm = scrut; } in
+       let* scrut = neutral scrut in
+       let* body =
+         let$ x1 = fresh ~user (Fin scrutsem) in
+         normal_clo1 ~ty:(Type (L.fin lv)) body x1
+       in
+       return @@ C.Build.struct_ ~lv ~scrut:(C.Build.infer scrut) ~body ()
 
   and normal_eta ~ty ~tm =
     match ty, tm with
@@ -406,6 +449,11 @@ module Conv = struct
 
   let rec normal_ ~allow_subtype ~ty ~lo ~hi =
     match ty, lo, hi with
+    | UnitTy,
+      _,
+      _ ->
+       return true
+
     | _,
       Reflect { tm = lo; _ },
       Reflect { tm = hi; _ } ->
@@ -471,11 +519,6 @@ module Conv = struct
       UnitTy ->
        return true
 
-    | UnitTy,
-      _,
-      _ ->
-       return true
-
     | _ ->
        return false
 
@@ -522,6 +565,16 @@ module Conv = struct
            ~allow_subtype
            ~ty:(Eval.clo1 lo_motive (Suc x1))
            ~lo:lo_case_succ ~hi:hi_case_succ x1 x2
+
+    | Struct (lo_lv, lo_scrut, lo_body),
+      Struct (hi_lv, hi_scrut, hi_body) ->
+       if lo_lv <> hi_lv
+       then return false
+       else neutral ~allow_subtype ~lo:lo_scrut ~hi:hi_scrut
+            &&& let$ x1 = Quote.fresh ~user:(clo1_name lo_body)
+                            (Fin (Reflect { ty = Nat; tm = lo_scrut; })) in
+                normal_clo1 ~allow_subtype
+                  ~ty:(Type L.(fin hi_lv)) ~lo:lo_body ~hi:hi_body x1
 
     | _ ->
        return false

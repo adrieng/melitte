@@ -16,8 +16,8 @@ let tabulate default table =
 let keyword_or_ident =
   tabulate (fun n -> ID n)
     [
-      ["forall"; "∀"], FORALL;
-      ["sig"; "Σ"], SIGMA;
+      ["Forall"; "∀"], FORALL;
+      ["Sig"; "Σ"], SIGMA;
       ["let"], LET;
       ["in"], IN;
       ["Type"; "𝕌"], TYPE;
@@ -33,6 +33,8 @@ let keyword_or_ident =
       ["×"], TIMES;
       ["Unit"; "𝟙"], UNITTY;
       ["Fin"], FIN;
+      ["Struct"; "𝕊"], STRUCT;
+      ["<"], LT;
     ]
 
 (** {1 Error handling} *)
@@ -83,6 +85,7 @@ let rec token lexbuf = match%sedlex lexbuf with
   | "," -> COMMA
   | "*" -> TIMES
   | '\\' | 955 -> LAM
+  | "@" -> AT
 
   | nat -> INT (int_of_lexbuf lexbuf)
   | atom -> keyword_or_ident (utf8_string_of_lexbuf lexbuf)
