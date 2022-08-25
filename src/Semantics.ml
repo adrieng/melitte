@@ -47,9 +47,11 @@ type ty = value
 
 (* Utility functions *)
 
-let rec clo1_name = function
-  | C1 (_, C.Bound1 { user; _ }) -> Name.of_option user
-  | C1suc clo -> clo1_name clo
+let rec clo1_name_option = function
+  | C1 (_, C.Bound1 { user; _ }) -> user
+  | C1suc clo -> clo1_name_option clo
+
+let clo1_name clo1 = Name.of_option @@ clo1_name_option clo1
 
 let close1 b1 env = C1 (env, b1)
 
@@ -204,7 +206,7 @@ module Eval = struct
           Struct(Suc(m), (x.P){σ}) =
           Σ (P{σ,x↦Zero}, (_.Struct(m, λy.let x = suc y in P)){σ}) *)
        let a = clo1 clo Zero in
-       let f = struct_ lv d (C1suc clo) in
+       let _f = struct_ lv d (C1suc clo) in
        Sigma (a, assert false)
     | Reflect { ty = Nat; tm; } ->
        Reflect { ty = Type (L.fin lv); tm = Struct (lv, tm, clo); }
@@ -349,9 +351,9 @@ module Quote = struct
   and typ tm =
     normal_ ~ty:limtype ~tm
 
-  and normal_clo1 ~ty (C1 (_, Bound1 { user; _ }) as clo) x =
+  and normal_clo1 ~ty clo x =
     let* body = normal_ ~ty ~tm:(Eval.clo1 clo x) in
-    return @@ C.Bound1 { body; user; }
+    return @@ C.Bound1 { body; user = clo1_name_option clo; }
 
   and normal_clo2 ~ty (C2 (_, Bound2 { user1; user2; _ }) as clo) x1 x2 =
     let* body = normal_ ~ty ~tm:(Eval.clo2 clo x1 x2) in
@@ -363,6 +365,10 @@ module Quote = struct
     | Reflect { tm; _ } ->
        let* tm = neutral tm in
        return @@ C.Build.infer tm
+
+    | Lam (C1suc _) ->
+       (* TODO *)
+       assert false
 
     | Lam (C1 (env, body)) ->
        (* This could be written in direct style, but for the sake of consistency
@@ -618,17 +624,17 @@ module PPrint = struct
   let env env =
     DeBruijn.Env.fold_cons entry env PPrint.empty
 
-  let clo1 (C1 (cenv, bound1)) =
-    let doc =
-      Core.ToRaw.bound1 bound1 (E.map (fun { user; _ } -> user) cenv)
-      |> Raw.PPrint.bound1
-    in
-    PPrint.(doc ^^ braces (env cenv))
+  (* let clo1 (C1 (cenv, bound1)) = *)
+  (*   let doc = *)
+  (*     Core.ToRaw.bound1 bound1 (E.map (fun { user; _ } -> user) cenv) *)
+  (*     |> Raw.PPrint.bound1 *)
+  (*   in *)
+  (*   PPrint.(doc ^^ braces (env cenv)) *)
 
-  let clo2 (C2 (cenv, bound2)) =
-    let doc =
-      Core.ToRaw.bound2 bound2 (E.map (fun { user; _ } -> user) cenv)
-      |> Raw.PPrint.bound2
-    in
-    PPrint.(doc ^^ braces (env cenv))
+  (* let clo2 (C2 (cenv, bound2)) = *)
+  (*   let doc = *)
+  (*     Core.ToRaw.bound2 bound2 (E.map (fun { user; _ } -> user) cenv) *)
+  (*     |> Raw.PPrint.bound2 *)
+  (*   in *)
+  (*   PPrint.(doc ^^ braces (env cenv)) *)
 end

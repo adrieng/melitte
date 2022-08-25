@@ -133,6 +133,4 @@ val limtype : value
 module PPrint : sig
   val value : value -> env -> PPrint.document
   val env : env -> PPrint.document
-  val clo1 : clo1 -> PPrint.document
-  val clo2 : clo2 -> PPrint.document
 end
