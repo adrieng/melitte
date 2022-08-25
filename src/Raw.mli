@@ -35,14 +35,20 @@ type term_desc =
   | Nat
   (** Type of natural numbers. *)
   | Zero
-  (** Nullary constructor of [Nat]. *)
+  (** Nullary constructor of [Nat] and [Fin]. *)
   | Suc of term
-  (** Unary constructor of [Nat]. *)
+  (** Unary constructor of [Nat] and [Fin]. *)
   | Natelim of { scrut : term;
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
   (** Dependent elimination form for natural numbers. *)
+  | UnitTy
+  (** Unit type. *)
+  | Unit
+  (** Unit constructor. *)
+  | Fin of term
+  (** Type of finite sets, indexed by its size (of type Nat). *)
   | Type of int
   (** Universe hierarchy. *)
   | Annot of { tm : term; ty : term; }
@@ -117,6 +123,9 @@ module Build : sig
                 case_zero:term ->
                 case_suc:bound2 ->
                 unit -> term
+  val unit_ty : ?loc:Position.t -> unit -> term
+  val unit : ?loc:Position.t -> unit -> term
+  val fin : ?loc:Position.t -> sz:term -> unit -> term
   val typ : ?loc:Position.t -> level:int -> unit -> term
   val annot : ?loc:Position.t -> tm:term -> ty:ty -> unit -> term
   val hypothesis : ?loc:Position.t -> pat:pattern -> ty:ty -> unit -> hypothesis

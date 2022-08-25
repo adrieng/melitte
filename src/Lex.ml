@@ -31,6 +31,8 @@ let keyword_or_ident =
       ["fst"; "π₁"], FST;
       ["snd"; "π₂"], SND;
       ["×"], TIMES;
+      ["Unit"; "𝟙"], UNITTY;
+      ["Fin"], FIN;
     ]
 
 (** {1 Error handling} *)

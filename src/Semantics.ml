@@ -14,6 +14,9 @@ type value =
   | Nat
   | Zero
   | Suc of value
+  | UnitTy
+  | Unit
+  | Fin of value
 
 and neutral =
   | Var of DeBruijn.Lv.t
@@ -94,6 +97,23 @@ module Eval = struct
     | C.Nat ->
        return Nat
 
+    | C.Zero ->
+       return Zero
+
+    | C.Suc t ->
+       let* t = cterm t in
+       return @@ Suc t
+
+    | C.UnitTy ->
+       return @@ UnitTy
+
+    | C.Unit ->
+       return @@ Unit
+
+    | C.Fin sz ->
+       let* sz = cterm sz in
+       return @@ Fin sz
+
   and iterm : C.iterm -> value M.t =
     fun tm ->
     match tm.i_desc with
@@ -117,13 +137,6 @@ module Eval = struct
     | C.Snd t ->
        let* t = iterm t in
        return @@ snd t
-
-    | C.Zero ->
-       return Zero
-
-    | C.Suc t ->
-       let* t = cterm t in
-       return @@ Suc t
 
     | C.Natelim { scrut; motive; case_zero; case_suc; } ->
        let* scrut = cterm scrut in
@@ -277,11 +290,11 @@ module Quote = struct
        return @@ C.Build.pair left right
 
     | Nat, Zero ->
-       return @@ C.Build.(infer @@ zero ())
+       return @@ C.Build.(zero ())
 
     | Nat, Suc tm ->
        let* tm = normal_ ~ty ~tm in
-       return @@ C.Build.(infer @@ suc tm)
+       return @@ C.Build.(suc tm)
 
     | _ ->
        Error.internal "ill-typed normal quotation"
@@ -304,8 +317,8 @@ module Quote = struct
     let* body = normal_ ~ty ~tm:(Eval.clo2 clo x1 x2) in
     return @@ C.Bound2 { body; user1; user2; }
 
-  (* This function avoids calling typ directly, since typ is type-directed and
-     we might be acting on an ill-typed value here. *)
+  (* This function avoids calling [typ], since [typ] is type-directed and we
+     might be acting on an ill-typed value here. *)
   and value = function
     | Reflect { tm; _ } ->
        let* tm = neutral tm in
@@ -362,11 +375,21 @@ module Quote = struct
        return @@ C.Build.nat ()
 
     | Zero ->
-       return @@ C.Build.(infer @@ zero ())
+       return @@ C.Build.zero ()
 
     | Suc tm ->
        let* tm = value tm in
-       return @@ C.Build.(infer @@ suc tm)
+       return @@ C.Build.(suc tm)
+
+    | UnitTy ->
+       return @@ C.Build.unit_ty ()
+
+    | Unit ->
+       return @@ C.Build.unit ()
+
+    | Fin sz ->
+       let* sz = value sz in
+       return @@ C.Build.(suc sz)
 end
 
 module Conv = struct
@@ -408,12 +431,18 @@ module Conv = struct
       Sigma (hi_dom, hi_cod) ->
        binder1 ~allow_subtype ~ty ~lo_dom ~lo_cod ~hi_dom ~hi_cod
 
-    | Nat,
+    | Fin Zero,
+      _,
+      _ ->
+       (* Fin Zero has no non-neutral inhabitants. *)
+       assert false
+
+    | (Nat | Fin _),
       Zero,
       Zero ->
        return true
 
-    | Nat,
+    | (Nat | Fin _),
       Suc lo,
       Suc hi ->
        normal_ ~allow_subtype ~ty ~lo ~hi
@@ -436,6 +465,16 @@ module Conv = struct
              ~ty:(Eval.clo1 cod (Eval.fst lo))
              ~lo:(Eval.snd lo)
              ~hi:(Eval.snd hi)
+
+    | Type _,
+      UnitTy,
+      UnitTy ->
+       return true
+
+    | UnitTy,
+      _,
+      _ ->
+       return true
 
     | _ ->
        return false

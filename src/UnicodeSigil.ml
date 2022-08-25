@@ -63,3 +63,5 @@ let omega = make [| 0x03C9 |] "omega"
 let times = make [| 0x00D7 |] "*"
 
 let sigma = make [| 0x03A3 |] "sigma"
+
+let unit = make [| 0x1D7D9 |] "unit"

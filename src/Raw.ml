@@ -21,6 +21,9 @@ type term_desc =
                  motive : bound1;
                  case_zero : term;
                  case_suc : bound2; }
+  | UnitTy
+  | Unit
+  | Fin of term
   | Type of int
   | Annot of { tm : term; ty : term; }
 
@@ -56,6 +59,8 @@ and phrase = phrase_desc Position.located
 type t = phrase list
 
 module Build = struct
+  (* TODO clean this submodule up *)
+
   let pvar ?(loc = Position.dummy) ~name () =
     Position.with_pos loc @@ PVar name
 
@@ -137,15 +142,24 @@ module Build = struct
   let natelim ?(loc = Position.dummy) ~scrut ~motive ~case_zero ~case_suc () =
     Position.with_pos loc @@ Natelim { scrut; motive; case_zero; case_suc; }
 
+  let unit_ty ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ UnitTy
+
+  let unit ?(loc = Position.dummy) () =
+    Position.with_pos loc @@ Unit
+
+  let fin ?(loc = Position.dummy) ~sz () =
+    Position.with_pos loc @@ Fin sz
+
+  let typ ?(loc = Position.dummy) ~level () =
+    if level < 0 then invalid_arg "typ";
+    Position.with_pos loc @@ Type level
+
   let annot ?(loc = Position.dummy) ~tm ~ty () =
     Position.with_pos loc @@ Annot { tm; ty; }
 
   let hypothesis ?(loc = Position.dummy) ~pat ~ty () =
     Position.with_pos loc @@ Hyp { pat; ty; }
-
-  let typ ?(loc = Position.dummy) ~level () =
-    if level < 0 then invalid_arg "typ";
-    Position.with_pos loc @@ Type level
 
   let val_ ?(loc = Position.dummy) ~name ~args ~ty ~def () =
     Position.with_pos loc @@ Val { name; args; ty; def; }
@@ -167,7 +181,8 @@ module PPrint = struct
   let pattern = Position.located pattern_desc
 
   let rec term_desc = function
-    | (Var _ | Type _ | Nat | Zero | Suc _ | App _ | Fst _ | Snd _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _ | App _ | Fst _ | Snd _
+       | UnitTy | Unit | Fin _) as t ->
        group (simple_term_desc t)
 
     | Lam _ as t ->
@@ -251,7 +266,8 @@ module PPrint = struct
        parens @@ group @@ term tm ^^ space ^^ colon ^/^ term ty
 
   and simple_term_desc = function
-    | (Var _ | Type _ | Nat | Zero | Suc _ | Fst _ | Snd _) as t ->
+    | (Var _ | Type _ | Nat | Zero | Suc _ | Fst _ | Snd _
+       | UnitTy | Unit | Fin _) as t ->
        very_simple_term_desc t
 
     | App (t, u) ->
@@ -296,6 +312,15 @@ module PPrint = struct
 
     | Snd t ->
        prefix 2 1 (!^ "snd") (very_simple_term t)
+
+    | UnitTy ->
+       U.doc U.unit
+
+    | Unit ->
+       !^ "()"
+
+    | Fin sz ->
+       prefix 2 1 (!^ "Fin") (very_simple_term sz)
 
     | t ->
        parens (term_desc t)

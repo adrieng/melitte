@@ -8,6 +8,11 @@ type cterm_desc =
   | Sigma of cterm * bound1
   | Pair of cterm * cterm
   | Nat
+  | Zero
+  | Suc of cterm
+  | UnitTy
+  | Unit
+  | Fin of cterm
   | Type of int
 
 and cterm =
@@ -23,8 +28,6 @@ and iterm_desc =
   | App of iterm * cterm
   | Fst of iterm
   | Snd of iterm
-  | Zero
-  | Suc of cterm
   | Natelim of { scrut : cterm;
                  motive : bound1;
                  case_zero : cterm;
@@ -115,6 +118,18 @@ module ToRaw = struct
          let* ty = cterm ty in
          let* body = bound1 body in
          return @@ Raw.Let { def; ty; body; }
+      | Zero ->
+         return Raw.Zero
+      | Suc t ->
+         let* t = cterm t in
+         return @@ Raw.Suc t
+      | UnitTy ->
+         return @@ Raw.UnitTy
+      | Unit ->
+         return @@ Raw.Unit
+      | Fin sz ->
+         let* sz = cterm sz in
+         return @@ Raw.Fin sz
       | Type l ->
          return @@ Raw.Type l
       | Nat ->
@@ -138,11 +153,6 @@ module ToRaw = struct
       | Snd m ->
          let* m = iterm m in
          return @@ Raw.Snd m
-      | Zero ->
-         return Raw.Zero
-      | Suc t ->
-         let* t = cterm t in
-         return @@ Raw.Suc t
       | Natelim { scrut; motive; case_zero; case_suc; } ->
          let* scrut = cterm scrut in
          let* motive = bound1 motive in
@@ -226,6 +236,15 @@ module Build = struct
 
   let nat ?loc () = cdesc ?loc Nat
 
+  let unit_ty ?loc () =
+    cdesc ?loc @@ UnitTy
+
+  let unit ?loc () =
+    cdesc ?loc @@ Unit
+
+  let fin ?loc sz =
+    cdesc ?loc @@ Fin sz
+
   let typ ?loc ~level () = cdesc ?loc @@ Type level
 
   let var ?loc ix = idesc ?loc @@ Var ix
@@ -236,9 +255,9 @@ module Build = struct
 
   let snd ?loc arg = idesc ?loc @@ Snd arg
 
-  let zero ?loc () = idesc ?loc Zero
+  let zero ?loc () = cdesc ?loc Zero
 
-  let suc ?loc t = idesc ?loc @@ Suc t
+  let suc ?loc t = cdesc ?loc @@ Suc t
 
   let natelim ?loc ~scrut ~motive ~case_zero ~case_suc () =
     idesc ?loc @@ Natelim { scrut; motive; case_zero; case_suc; }

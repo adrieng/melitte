@@ -1,3 +1,5 @@
+type expected_kind = [ `Pi | `Sigma | `Nat_or_fin | `Unit | `Univ ]
+
 type error =
   | Internal of string
   | Syntax of Position.t * string
@@ -8,7 +10,7 @@ type error =
                        actual : PPrint.document; }
   | Unexpected_type of { loc : Position.t; expected : PPrint.document; }
   | Unexpected_head_constr of { loc : Position.t;
-                                expected : [`Pi | `Sigma | `Nat | `Univ];
+                                expected : expected_kind;
                                 actual : PPrint.document; }
   | Universe_inconsistency of Position.t
 
@@ -43,7 +45,8 @@ let print fmt = function
      let head_constr = function
        | `Pi -> PPrint.(doc forall ^^ space ^^ underscore)
        | `Sigma -> PPrint.(doc sigma ^^ space ^^ underscore)
-       | `Nat -> doc nat
+       | `Nat_or_fin -> PPrint.string "Nat or Fin (Suc _)"
+       | `Unit -> doc unit
        | `Univ -> doc typ
      in
      Format.fprintf fmt

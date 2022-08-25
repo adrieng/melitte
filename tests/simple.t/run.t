@@ -55,3 +55,8 @@ Melitte contains a hierarchy of universes.
 Melitte contains Σ types.
 
   $ melitte t5.melitte
+
+Melitte contains finite types.
+
+  $ melitte t6.melitte
+  $ melitte t7.melitte

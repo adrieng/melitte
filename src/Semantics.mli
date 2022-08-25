@@ -29,6 +29,9 @@ type value =
   | Nat
   | Zero
   | Suc of value
+  | UnitTy
+  | Unit
+  | Fin of value
 
 (** Neutrals are left abstract. *)
 and neutral
@@ -91,6 +94,8 @@ module Quote : sig
   val typ : value -> Core.cterm M.t
 
   val neutral : neutral -> Core.iterm M.t
+
+  (* TODO delete the following function and write some ad-hoc pretty-printer. *)
 
   (** [value] does not perform η-expansion, hence it should not be used when
       checking convertibility or, more generally, when performing normalization

@@ -8,6 +8,7 @@
 %token<int> INT
 
 %token LAM FORALL SIGMA LET IN TYPE NAT ZERO SUC ELIM WITH VAL EVAL FST SND
+%token UNITTY FIN
 %token LPAREN RPAREN LBRACE RBRACE
 %token EQ ARR DARR TIMES
 %token UNDERSCORE COLON BAR COMMA
@@ -42,6 +43,9 @@ very_simple_term_:
 | k = INT { B.lit ~k }
 | ZERO { B.zero }
 | SUC t = very_simple_term { B.suc ~t }
+| UNITTY { B.unit_ty }
+| LPAREN RPAREN { B.unit }
+| FIN sz = very_simple_term { B.fin ~sz }
 | FST arg = very_simple_term { B.fst ~arg }
 | SND arg = very_simple_term { B.snd ~arg }
 | te = parens(term_) { te }

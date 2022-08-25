@@ -43,3 +43,5 @@ val omega : t
 val times : t
 
 val sigma : t
+
+val unit : t
