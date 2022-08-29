@@ -1,6 +1,7 @@
 (** {1 Core Syntax} *)
 
-(** This module defines well-typed syntax, as produced by the elaborator. *)
+(** This module defines well-typed syntax, as produced by the elaborator. Here
+    variables are implemented by De Bruijn indices. *)
 
 (** The type of a checkable term, or [cterm], must be provided. *)
 type cterm_desc =

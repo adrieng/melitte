@@ -1,5 +1,24 @@
+(** {1 Semantics} *)
+
+(** This module handles the normalization-by-evaluation (NbE) algorithm for the
+    language defined in {! Core}. This relies on three key notions: values,
+    neutrals, and normals. NbE consists in two main steps:
+
+    - evaluation, which turns a piece of source code into a semantic value, and
+
+    - quotation, which maps a semantic value back to source code.
+
+    In contrast with what happens in classical evaluators for non-dependent
+    languages, here evaluation is extended to deal with open terms. The
+    quotation process is type-directed and guaranteed to return η-long, β-short
+    normal forms.
+ *)
+
 (** {2 Type declarations} *)
 
+(** Values are results of evaluation. Since we evaluate open terms, they include
+    neutrals, which are blocked computations. We use closures to represent
+    not-yet-evaluated pieces of code. *)
 type value =
   | Reflect of { ty : value; tm : neutral; }
   | Lam of clo1
@@ -11,8 +30,10 @@ type value =
   | Zero
   | Suc of value
 
+(** Neutrals are left abstract. *)
 and neutral
 
+(** A normal form is a value "reified" at some type. *)
 and normal = Reify of { ty : value; tm : value; }
 
 and clo1 = C1 of env * Core.bound1
@@ -29,23 +50,6 @@ and entry =
 and env = entry DeBruijn.Env.t
 
 type ty = value
-
-(** {2 Utility values} *)
-
-val close1 : Core.bound1 -> env -> clo1
-
-val close2 : Core.bound2 -> env -> clo2
-
-(** [limtype] is the top of our universe hierarchy. It does not exist in the
-    syntax but allows for a simpler formulation of the elaboration algorithm. *)
-val limtype : value
-
-module PPrint : sig
-  val value : value -> env -> PPrint.document
-  val env : env -> PPrint.document
-  val clo1 : clo1 -> PPrint.document
-  val clo2 : clo2 -> PPrint.document
-end
 
 (** {2 Evaluation, from syntax to semantics} *)
 
@@ -99,6 +103,31 @@ end
 (** {2 Convertibility and normalization} *)
 
 module Conv : sig
-  val ty : lo:value -> hi:value -> bool Quote.M.t
+  (** The [normalize] function composes reflection and reification to obtain
+      normal forms. *)
   val normalize : ty:ty -> tm:Core.cterm -> Core.cterm Eval.M.t
+
+  (** The [ty ~lo ~hi] tests whether [lo] is a subtype to [hi] for the subtyping
+      relation induced by universe levels. Conceptually, this works by comparing
+      normal forms, but the algorithm here is more efficient. *)
+  val ty : lo:value -> hi:value -> bool Quote.M.t
+end
+
+(** {2 Utility functions} *)
+
+val close1 : Core.bound1 -> env -> clo1
+
+val close2 : Core.bound2 -> env -> clo2
+
+(** [limtype] is the top of our universe hierarchy. It does not exist in the
+    syntax but allows for a simpler formulation of the elaboration algorithm. *)
+val limtype : value
+
+(** {2 Printing} *)
+
+module PPrint : sig
+  val value : value -> env -> PPrint.document
+  val env : env -> PPrint.document
+  val clo1 : clo1 -> PPrint.document
+  val clo2 : clo2 -> PPrint.document
 end
